@@ -1,0 +1,159 @@
+{
+    "__default__":
+    {
+        "h_vmem": "2g",
+        "h_rt": "4:00:00",
+        "pe": "smp 4",
+        "os": "centos7",
+        "name"      : "JOBNAME.{rule}.{wildcards}",
+        "output"    : "logs/cluster/{rule}.{wildcards}.out",
+        "error"     : "logs/cluster/{rule}.{wildcards}.err"
+
+    },
+
+    "collapse_reads":
+    {
+        "h_vmem": "8G",
+        "pe": "smp 4"
+    },
+    "readlenfilt":
+    {
+        "h_vmem": "8G",
+        "pe": "smp 4"
+    },
+    "cdsmax":
+    {
+        "h_vmem": "8G",
+        "pe": "smp 4"
+    },
+    "collapse_reads":
+    {
+        "h_vmem": "8G",
+        "pe": "smp 4"
+    },
+    "trim_reads":
+    {
+        "h_vmem": "8G",
+        "pe": "smp 4"
+    },
+    "trimming":
+    {
+        "h_vmem": "2G",
+        "h_rt": "40:00:00",
+        "pe": "smp 4"
+    },
+    "run_riboqc":
+    {
+        "h_vmem": "16G",
+        "h_rt": "40:00:00",
+        "pe": "smp 8"
+    },
+    "run_satann":
+    {
+        "h_vmem": "8G",
+        "h_rt": "40:00:00",
+        "pe": "smp 8"
+    },
+    "run_satann_group":
+    {
+        "h_vmem": "8G",
+        "h_rt": "40:00:00",
+        "pe": "smp 8"
+    },
+    "knit_riboqc":
+    {
+        "h_vmem": "8G",
+        "h_rt": "40:00:00",
+        "pe": "smp 1"
+    },
+    "make_bowtie_indices":
+    {
+        "h_vmem": "32G",
+        "os": "centos6",
+        "h_rt": "12:00:00",
+        "pe": "smp 6"
+    },
+    "star_index":
+    {
+        "h_vmem": "32G",
+        "os": "centos6",
+        "h_rt": "12:00:00",
+        "pe": "smp 6"
+    },
+    "star":
+    {
+        "h_vmem": "32G",
+        "os": "centos6",
+        "h_rt": "12:00:00",
+        "pe": "smp 6"
+    },
+    
+    "gsnap":
+    {
+        "h_vmem": "32G",
+#"os": "centos6",
+        "h_rt": "40:00:00",
+        "pe": "smp 6"
+    },
+    "hisat":
+    {
+        "h_vmem": "32G",
+#"os": "centos6",
+        "h_rt": "12:00:00",
+        "pe": "smp 6"
+    },
+    "filter_tRNA_rRNA":
+    {
+        "h_vmem": "32G",
+        "os": "centos6",
+        "h_rt": "12:00:00",
+        "pe": "smp 6"
+    },
+    "junction_star":
+    {
+        "h_vmem": "4G",
+        "h_rt": "12:00:00",
+        "pe": "smp 8"
+    },
+
+    "htseq":
+    {
+        "h_vmem": "4g",
+#"h_rt": "40:00:00",
+        "pe": "smp 1"
+    },
+
+    "feature_counts":
+    {
+        "h_vmem": "2g",
+#"h_rt": "1:00:00",
+        "pe": "smp 2"
+    },
+
+    "rsem":
+    {
+        "h_vmem": "4G",
+        "h_rt": "40:00:00",
+        "pe": "smp 8"
+    },
+
+    "infer_experiment":
+    {
+        "h_vmem": "2G",
+#"h_rt": "40:00:00",
+        "pe": "smp 1"
+    },
+
+    "qc":
+    {
+        "h_vmem": "16G",
+#"h_rt": "40:00:00",
+        "pe": "smp 1"
+    },
+    "dupradar":
+    {
+        "h_vmem": "4g",
+#"h_rt": "40:00:00",
+        "pe": "smp 8"
+    }
+}

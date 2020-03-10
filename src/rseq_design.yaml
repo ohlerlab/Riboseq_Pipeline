@@ -1,0 +1,243 @@
+# for each data subset we do an analysis
+# and then for each contrast within that we do an analysis
+# we should be able to specify most things at whatever level we want
+# so for instance we can specify the model and then a bunch of contrasts within it
+parameters:
+  # this gtf should be the same as the one used for featurecounts
+  annotation_gtf: 'pipeline/genes.chrnm.gtf'
+  # "group" column in sample_parameter.csv is split into these columns
+  # mcols: ['treatment','assay']
+  mcols:  ['type','assay','nstage','mstage']
+  # root directory for analysis
+  root: '/fast/work/groups/ag_ohler/dharnet_m/Mitosis_Riboseq/pipeline/run_rseq'
+  # where all the rmd's are
+  rmdfold: '/fast/work/groups/ag_ohler/dharnet_m/senescence_ribo/Applications/rseq/inst/rmd/de/'
+  # where rseq is
+  rseq_path: '/fast/work/groups/ag_ohler/dharnet_m/senescence_ribo/Applications/rseq/'
+  # where the RNA-seq pipeline output is
+  pipeline_results_path: '/fast/work/groups/ag_ohler/dharnet_m/Mitosis_Riboseq/pipeline/'
+  sample_param_file: '/fast/work/groups/ag_ohler/dharnet_m/Mitosis_Riboseq/src/sample_parameter.csv'
+
+  # thresholding significant changes
+  ## used in ma-plot and creating table, and for determining de genes for GO/KEGG
+  my_alpha: 0.05
+  ## used for creatqqing table and for determining de genes for GO/KEGG enrichment
+  ## upregulated: log2fc > my_log2fc_th
+  ## downregulated: log2fc < - my_log2fc_th
+  my_log2fc_th: 0
+
+  # dual scale settings for heatmaps and MA plots
+  ## setting values outside of the range [z_min, z_max] to the limiting values
+  z_max:  20
+  z_min:  -20
+
+  # set to FALSE to suppress GO term analysis
+  do_GO: TRUE
+  custom_go_mapping: '/fast/work/groups/ag_ohler/dharnet_m/Mitosis_Riboseq/ext_data/go_mapping.txt'
+  # use the appropriate bioconductor OrgEgDb
+  # my_org_eg_db: "org.Mm.eg
+  # also used to select the entrez ensembl map
+  my_org_eg_db: "other" 
+
+  # KEGG enrichment (set to FALSE to suppress KEGG analysis)
+  do_KEGG: False
+  ## organism id
+  # kegg_org: "mmu"
+  kegg_org: "hsa"
+  kegg_p_value_cutoff: 0.05
+  kegg_q_value_cutoff: 0.2
+  kegg_min_gs_size: 5
+  kegg_max_gs_size: 500
+  kegg_p_adj_meth: "BH"
+
+  # if genes of interest are specified in a file called "genes_of_interest.txt" then we can plot their expression
+  do_GOI: True
+  genes_of_interest_file: "/fast/work/groups/ag_ohler/dharnet_m/Mitosis_Riboseq/ext_data/Meiotic_regulators_manual_collection_v3_ZmOrthologs_For_Dermot - ZmOrthologs_nonRedundant.tsv"
+
+  # here we can add custom gene sets to test for enrichment (in gmt format, as from MSigDB)
+  do_gage: True
+  custom_gene_sets:
+      Meoitic_genes: "/fast/work/groups/ag_ohler/dharnet_m/Mitosis_Riboseq/ext_data/Meiotic_regulators_manual_collection_v3_ZmOrthologs_For_Dermot - ZmOrthologs_nonRedundant.tsv"
+
+  custom_q_value_cutoff: 0.05
+  custom_log2fc_th: .5
+
+
+  useBetaPrior: TRUE
+  
+  testrunonly: FALSE
+  do_diagnostics: FALSE
+  testcontrasts: FALSE
+
+factor_levels:
+  assay:
+  - total
+  - ribo
+  type:
+  - PRE
+  - LEP
+  - ZYG
+  - PACH
+  - MII
+  mstage:
+  - PRE
+  - LEP
+  - ZYGPACH
+  - MII
+
+
+
+  # LEP:
+  #   - 0
+  #   - 1
+  # ZYG:
+  #   - 0
+  #   - 1
+  # PACH:
+  #   - 0
+  #   - 1
+  # MII:
+  #   - 0
+  #   - 1
+#  define subsets by selecting specific factor levels
+subsets:
+  # justRNAseq:
+  #   sample_spec:
+  #     assay: "total"
+  #   models:
+  #     treatment:
+  #       parameters:
+  #         useBetaPrior: 
+  #       modelstring: "~treatment"
+  #       contrasts:
+  #         'treatment':
+  #           contrast_spec: [0,0,1]
+  All:
+    sample_spec: ".*"
+    models:
+    #   TE_change_cyc_spline3:
+    #     parameters:
+    #       do_diagnostics:
+    #       groupinteraction: FALSE
+    #       # stepwisespline: TRUE
+    #       useBetaPrior: FALSE
+    #     modelstring: "~ assay * cs(nstage,3)"
+    #     contrasts:
+    #        'Average TE':
+    #           contrast_spec: 'assay_ribo_vs_total'
+    #        # 'test': 
+    #           # contrast_spec: [0,0,0,1]
+    #        'LEP vs PRE':
+    #           contrast_spec: foo
+    #        'ZYG vs LEP':
+    #           contrast_spec: foo
+    #        'PACH vs ZYG':
+    #           contrast_spec: foo
+    #        'MII vs PACH':
+    #           contrast_spec: foo
+    #        'PRE vs MII':
+    #           contrast_spec: foo
+    #   TE_change_spline3:
+    #     parameters:
+    #       groupinteraction: FALSE
+    #       # stepwisespline: TRUE
+    #       useBetaPrior: FALSE
+    #     modelstring: "~ assay * cs(nstage,3)"
+    #     contrasts:
+    #        'Average TE':
+    #           contrast_spec: 'assay_ribo_vs_total'
+    #        # 'test': 
+    #           # contrast_spec: [0,0,0,1]
+    #        'LEP vs PRE':
+    #           contrast_spec: [0,0,0,0,0,-0.0892145836211284,0.478581250863385,-0.319054167242257]
+    #        'ZYG vs LEP':
+    #           contrast_spec: [0,0,0,0,0,0.40968794521819,-0.00250133565456956,0.0225008904363798]
+    #        'PACH vs ZYG':
+    #           contrast_spec: [0,0,0,0,0,0.181788451556544,-0.154740354669634,0.402639403113089]
+    #        'MII vs PACH':
+    #           contrast_spec: [0,0,0,0,0,-0.645118956010749,0.107231868032247,0.608199587978502]
+    #        'PRE vs MII':
+    #           contrast_spec: [0,0,0,0,0,0.142857142857143,-0.428571428571429,-0.714285714285714]
+
+
+      # TE_change_spline2:
+      #   parameters:
+      #     groupinteraction: FALSE
+      #     useBetaPrior: FALSE
+      #   modelstring: "~ assay * ns(nstage,2)"
+      #   contrasts:
+      #      'Average TE':
+      #         contrast_spec: 'assay_ribo_vs_total'
+      #      'Time dependent change in TE':
+      #         contrast_spec: [0,0,0,0,1,1]
+       # TE_change_linear:
+       #  parameters:
+       #    groupinteraction: FALSE
+       #    useBetaPrior: FALSE
+       #  modelstring: "~ assay * nstage"
+       #  contrasts:
+       #     # 'Average TE':
+       #        # contrast_spec: 'assay_ribo_vs_total'
+       #     'Time dependent change in TE':
+       #        contrast_spec: [0,0,0,1]
+       TE_change_zygpachmerge:
+        parameters:
+          groupinteraction: FALSE
+          useBetaPrior: FALSE
+        modelstring: "~ assay * mstage"
+        contrasts:
+           'Average TE':
+              contrast_spec: 'assay_ribo_vs_total'
+           'Time dependent change in TE - LEP vs PRE':
+              contrast_spec: [0,0,0,0,0,1,0,0]
+           'Time dependent change in TE - ZYGPACH vs LEP':
+              contrast_spec: [0,0,0,0,0,-1,1,0]
+           'Time dependent change in TE - MII vs ZYGPACH':
+              contrast_spec: [0,0,0,0,0,0,-1,1]
+
+
+      # TE_change_xtail:
+      #   parameters:
+      #     useBetaPrior: FALSE
+      #     alt_res_file: 'pipeline/xtail/xtail_treatment.tsv'
+      #   modelstring: "~assay+treatment+assay:treatment"
+      #   contrasts:
+      #      'Change in TE between Treatments':
+      #         contrast_spec: 'assayribo.treatmentRas'
+
+      #example of a numeric covariate
+      # dosage:
+      #   modelstring: "~ dosage"
+      #   contrasts:
+      #     interaction_hom_cardio:
+      #       contrast_spec:       
+      #         # [0,1]
+      #         "dosage"
+
+      #example of an interaction term - test first with groupinteraction=FALSE and useBetaPrior=FALSE
+      #to figure out the appropriate name for the contrast spec, then switch to get shrinkage
+      #genotype_celltype_interaction:
+      #  parameters:
+      #    groupinteraction: TRUE
+      #    betaPrior: FALSE
+      #  modelstring: "~ genotype + celltype + genotype:celltype"
+      #  contrasts:
+      #    interaction_hom_cardio:
+      #      contrast_spec: "genotypehom.celltypecardiom" # by running with betaprior=FALSE you can figure out the name of this term
+      # #note this gives identical output to the above contrast
+      # genocell_manual_groups:
+      #   modelstring: "~group"
+      #   contrasts:
+      #     'interaction hom':
+      #       contrast_spec: [0,1,-1,0,0,-1,1]
+
+      # #we currently can't do interactions with numeric covariates and shrinkage, these need to
+      # #be done with betaPrior = FALSE 
+      # dosagecell_manual_groups:
+      #   modelstring: "~dosage + celltype + dosage:celltype"
+      #   parameters:
+      #       useBetaPrior: FALSE
+      #   contrasts:
+      #     'interaction':
+      #       contrast_spec: dosage.celltypecardiom
+ 

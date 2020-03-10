@@ -1,0 +1,26 @@
+name: hisat2
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+dependencies:
+  - _libgcc_mutex=0.1=main
+  - ca-certificates=2019.6.16=hecc5488_0
+  - certifi=2019.6.16=py27_1
+  - hisat2=2.1.0=py27h6bb024c_3
+  - libffi=3.2.1=he1b5a44_1006
+  - libgcc-ng=9.1.0=hdf63c60_0
+  - libstdcxx-ng=9.1.0=hdf63c60_0
+  - ncurses=6.1=hf484d3e_1002
+  - openssl=1.1.1c=h516909a_0
+  - perl=5.26.2=h516909a_1006
+  - pip=19.2.1=py27_0
+  - python=2.7.15=h5a48372_1009
+  - readline=8.0=hf8c457e_0
+  - setuptools=41.0.1=py27_0
+  - sqlite=3.29.0=hcee41ef_0
+  - tk=8.6.9=hed695b0_1002
+  - wheel=0.33.4=py27_0
+  - zlib=1.2.11=h516909a_1005
+prefix: /fast/users/dharnet_m/work/miniconda3/envs/hisat2
+

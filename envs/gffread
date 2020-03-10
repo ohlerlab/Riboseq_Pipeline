@@ -1,0 +1,9 @@
+name: gffread
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+dependencies:
+  - gffread=0.9.12=0
+prefix: /fast/users/dharnet_m/work/miniconda3/envs/gffread
+
