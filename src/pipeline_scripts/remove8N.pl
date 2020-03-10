@@ -13,8 +13,8 @@ my $filename =$ARGV[0];
 my $N1;
 my $N2;
 my $filenameout = $filename;
-$filenameout =~ s/(.*)\.([^\.]*)$/$1-2xNNNN\.fastq/;
-#my $filenameout =$ARGV[1];
+#$filenameout =~ s/(.*)\.([^\.]*)$/$1-2xNNNN\.fastq/;
+my $filenameout =$ARGV[1];
 
 #print ("\nFilename in:",$filename,"\n");
 
