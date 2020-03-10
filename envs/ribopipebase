@@ -1,4 +1,4 @@
-name: MarcoP
+name: ribopipe
 channels:
   - r
   - anaconda
@@ -20,6 +20,12 @@ dependencies:
   - bedtools=2.29.2=hc088bd4_0
   - binutils_impl_linux-64=2.33.1=h53a641e_8
   - binutils_linux-64=2.33.1=h9595d00_16
+  - bioconductor-biocgenerics=0.32.0=r36_0
+  - bioconductor-biostrings=2.54.0=r36h516909a_0
+  - bioconductor-iranges=2.20.0=r36h516909a_0
+  - bioconductor-s4vectors=0.24.0=r36h516909a_0
+  - bioconductor-xvector=0.26.0=r36h516909a_0
+  - bioconductor-zlibbioc=1.32.0=r36h516909a_0
   - bleach=3.1.0=py_0
   - boto3=1.11.9=py_0
   - botocore=1.14.9=py_0
@@ -40,7 +46,7 @@ dependencies:
   - defusedxml=0.6.0=py_0
   - dnaio=0.4.1=py36h516909a_0
   - docutils=0.15.2=py36_0
-  - drmaa=0.7.9=py36_0
+  - drmaa=0.7.9=py_1000
   - dropbox=9.4.0=py_0
   - entrypoints=0.3=py36_1000
   - expat=2.2.9=he1b5a44_2
@@ -404,5 +410,4 @@ dependencies:
     - pyparsing==2.4.6
     - simplejson==3.17.0
     - spectra==0.0.11
-prefix: /home/emeerdi/miniconda3/envs/MarcoP
 
