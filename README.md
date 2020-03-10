@@ -14,7 +14,15 @@ Running the pipeline consist of _ main steps
     - sample parameter should be modified to include any metadata and covariates you want to model, as well as fragment length (or just use defaults) for RNA samples
 	- sample_parameter.csv also contains data on whether things are strand specific or not, and if they are paired.
 	- Now modify config.yaml to point at the annotation etc. you want to use, as well as the locations of RiboseQC and ORFquant (they can be cloned if they are missing)
-	- 
+	- link the snakemake file to the pipeline folder with ln -s ../src/pipeline.smk Snakefile. Now you can do snakemake -n instead of snakemake -s ../src/pipeline.smk -n.
+2. Running the pipeline
+    - first do a 'dry run' and see if the snakefile works, without runnning commands - `snakemake -n`. Debug
+    - The pipeline is run by doing ```bash ../src/snake_job.sh```
+3. Inevitable debugging
+    - The bugs you will face (and you will face them) can be divided into several main catagories.
+    1. Bugs at the level of Snakemake
+        - often the snakemake won't run the way you think it should, this is often due to irregularities in the input files (did you use a commma where a space should be, typos in sample ids, etc etc) test run the snakemake by doing snakemake -n 
+    
 
 #copy in files (so nodes can see them)
 	find /data/ohler/seqData/819-836/RiboFP_rRNA_depletion_test/ -iname '*fastq.gz' | grep R1  | xargs -I{} rsync -avshP {} input/

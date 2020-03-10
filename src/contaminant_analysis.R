@@ -3,12 +3,12 @@ library(data.table)
 library(magrittr)
 
 #read the index file
-indexfasta <- 'pipeline/filter_reads/tRNA_rRNA_index/tRNA_rRNA_index.fa'
+indexfasta <- 'pipeline/tRNA_rRNA_index/tRNA_rRNA_index.fa'
 contam_headers <- readLines(indexfasta) %>% str_extract('>.*')
 contam_headers_df <- data.frame(header = contam_headers)
 contam_headers_df %<>% filter(!is.na(header))
 #extract unique ids from the contamination fasts
-contam_headers_df %<> %mutate(contam_id = str_extract(header,'(?<=>)\\d+') %>% as.numeric)	
+contam_headers_df %<>%mutate(contam_id = str_extract(header,'(?<=>)\\d+') %>% as.numeric)	
 contam_headers_df %>% head
 #all ids extracted successfully
 stopifnot((contam_headers_df[['contam_id']]==(1:nrow(contam_headers_df))))
@@ -16,7 +16,7 @@ stopifnot((contam_headers_df[['contam_id']]==(1:nrow(contam_headers_df))))
 #read in our idx files
 idxfiles <- Sys.glob('pipeline/filter_reads/*/*.idxtmp')
 
-idxfile <- 'pipeline/filter_reads/RNA_PRE/RNA_PRE_1.fastq.gz.idxtmp'
+#idxfile <- 'pipeline/filter_reads/RNA_PRE/RNA_PRE_1.fastq.gz.idxtmp'
 idxfiles%<>%setNames(.,basename(dirname(.)))
 
 samples_idx <- idxfiles%>%map_df(.id='sample',function(idxfile){

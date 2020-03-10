@@ -254,6 +254,8 @@ rule collapse_reads:
 rule trim_reads:
     input: 'collapse_reads/{sample}/{fastq}'
     output: 'trim_reads/{sample}/{fastq}'
+    params:
+      outdir = lambda wc,output: Path(output[0]).parent
     run:
         sample = wildcards['sample']
         shell(r"""
@@ -271,25 +273,38 @@ rule trim_reads:
 ##########################################################
 ######### trna/rRNA filtering with bowtie
 ##########################################################
-rule make_trna_rrna_indices:
+rule number_contaminants:
   input: contaminants=config['Contam']
+  output: 'tRNA_rRNA_index/tRNA_rRNA_index.fa',
+  threads: 8
+  params:
+    fafile = lambda wc,output: output[0].replace('.done','')+'.fa'
+  shell: r"""
+      #number the contaminant sequences
+    R -e '
+      library(Biostrings); 
+      seq = readDNAStringSet("{input.contaminants}");
+      seq = unique(seq);
+      seq = setNames(seq,paste0(seq_along(.),"_",names(.)));
+      writeXStringSet(seq,"{output}");
+      write.table(col.names=F,row.names=F,data.frame(names(seq)),"tRNA_rRNA_index.names.txt");
+    ' 
+
+    """
+
+rule make_trna_rrna_indices:
+  input: 'tRNA_rRNA_index/tRNA_rRNA_index.fa'
   output: touch('tRNA_rRNA_index/tRNA_rRNA_index.done'),
   conda: '../envs/star'
   threads: 8
   params:
     outprefix = lambda wc,output: output[0].replace('/tRNA_rRNA_index.done',''), 
-    fafile = lambda wc,output: output[0].replace('.done','')+'.fa'
   shell: r"""
-      #get rRNAs and tRNAs, rename the tRNAs to exons for GenePRed,
-      #get the gene type out and stick it front of the transcript id
-      #for better names in the fasta
-    cp {input.contaminants} {params.fafile}
-
     STAR \
     --runThreadN {threads} \
     --runMode genomeGenerate \
     --genomeDir {params.outprefix} \
-    --genomeFastaFiles {input.contaminants}
+    --genomeFastaFiles {input}
     """
 
 rule filter_tRNA_rRNA: 
@@ -540,7 +555,7 @@ rule star:
           rfastqs=get_sample_fastqs2,
           STARINDEX='starindex/starindex.done',
      output:
-          done = touch('star/data/{sample,[^/]+}/.done'),bam='star/data/{sample}/{sample}.bam'
+          done = touch('star/data/{sample,[^/]+}/.done'),bam='star/data/{sample}/{sample}.bam',bai='star/data/{sample}/{sample}.bam.bai'
      threads: 8
      conda: "../envs/star"
      #please check params, there is a lot of stuff i did.
@@ -1107,7 +1122,7 @@ rule make_riboseqc_anno:
   shell:r"""
     set -x
     awk -vOFS="\t" '{{print $1,0,$2}}' {REF}.fai | bedtools intersect -b - -a {GTF} > {params.gtfmatchchrs} 
-    R -e 'if (is.element("RiboseQC",installed.packages()[,1]) == 0) {{devtools::install("{RIBOSEQCPACKAGE}")}}'
+    R -e 'if (! "RiboseQC" %in% installed.packages()) devtools::install("{RIBOSEQCPACKAGE}",upgrade="never")'
     mkdir -p $(dirname {output[0]})
     R -e 'devtools::load_all("{RIBOSEQCPACKAGE}");args(prepare_annotation_files) ;prepare_annotation_files(annotation_directory=".",gtf_file="{params.gtfmatchchrs}",annotation_name="{params.annobase}",forge_BS=FALSE, genome_seq=FaFile("{REF}"))'
  """
@@ -1160,17 +1175,19 @@ rule segment_periodicity:
 #####Added pulling ORFquant from the config
 ORFquantPACKAGE = config['ORFquantPACKAGE']
 rule run_ORFquant:
-  input : 'riboseqc/data/{sample}/.done',GTF.with_suffix('.matchchrs.gtf_Rannot')
+  input : 'riboseqc/data/{sample}/.done',annofile=GTF.with_suffix('.matchchrs.gtf_Rannot')
   output: touch('ORFquant/{sample}/.done')
   params: 
     for_ORFquantfile = lambda wc,input: 'c("'+('","'.join(['riboseqc/data/'+s+'/''_for_ORFquant' for s in [wc['sample']] ]))+'")',
-    annofile = lambda wc,input: 'riboseqc/'+Path(GTF).name.replace('.gtf','.matchchrs.gtf_Rannot'),
+
     outputdir = lambda wc,output: output[0].replace('.done','')
   threads: 10
   shell:r"""
     set -ex
       mkdir -p {params.outputdir}
-      R -e 'devtools::load_all("{ORFquantPACKAGE}");run_ORFquant(for_ORFquant_file = {params.for_ORFquantfile},annotation_file = "{params.annofile}",genome_seq = "{REF}", n_cores = {threads},prefix="{params.outputdir}") '
+      R -e 'if (! "ORFquant" %in% installed.packages()) devtools::install("{ORFquantPACKAGE}",upgrade="never")'
+
+      R -e 'devtools::load_all("{ORFquantPACKAGE}");run_ORFquant(for_ORFquant_file = {params.for_ORFquantfile},annotation_file = "{input.annofile}", n_cores = {threads},prefix="{params.outputdir}") '
         
       """
 ######## Here loading ORFquant can be done directly within R after installing it.
