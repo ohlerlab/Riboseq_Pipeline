@@ -1122,12 +1122,11 @@ rule make_riboseqc_anno:
   shell:r"""
     set -x
     awk -vOFS="\t" '{{print $1,0,$2}}' {REF}.fai | bedtools intersect -b - -a {GTF} > {params.gtfmatchchrs} 
-    R -e 'if (! "RiboseQC" %in% installed.packages()) devtools::install("{RIBOSEQCPACKAGE}",upgrade="never")'
     mkdir -p $(dirname {output[0]})
-    R -e 'devtools::load_all("{RIBOSEQCPACKAGE}");args(prepare_annotation_files) ;prepare_annotation_files(annotation_directory=".",gtf_file="{params.gtfmatchchrs}",annotation_name="{params.annobase}",forge_BS=FALSE, genome_seq=FaFile("{REF}"))'
+    R -e 'library("RiboseQC"); prepare_annotation_files(annotation_directory=".",gtf_file="{params.gtfmatchchrs}",annotation_name="{params.annobase}",forge_BS=FALSE, genome_seq=FaFile("{REF}"))'
  """
 
-
+#R -e 'if (! "RiboseQC" %in% installed.packages()) devtools::install("{RIBOSEQCPACKAGE}",upgrade="never")'
 ####################################################################################################
 ####################################################################################################
 ####################################################################################################
@@ -1164,7 +1163,7 @@ rule run_riboseqc:
          set -x
          mkdir -p {params.outname}
          mkdir -p riboseqc/reports/{wildcards.sample}
-         R -e 'devtools::load_all("{RIBOSEQCPACKAGE}");RiboseQC::RiboseQC_analysis("{params.annofile}", bam="{input.bam}",rescue_all_rls=TRUE,dest_names="{params.outname}", genome_seq = "{REF}", report_file="{params.report_file}")'
+         R -e 'library("RiboseQC");RiboseQC_analysis("{params.annofile}", bam="{input.bam}",rescue_all_rls=TRUE,dest_names="{params.outname}", genome_seq = "{REF}", report_file="{params.report_file}")'
      """
 
 rule segment_periodicity:
@@ -1185,9 +1184,7 @@ rule run_ORFquant:
   shell:r"""
     set -ex
       mkdir -p {params.outputdir}
-      R -e 'if (! "ORFquant" %in% installed.packages()) devtools::install("{ORFquantPACKAGE}",upgrade="never")'
-
-      R -e 'devtools::load_all("{ORFquantPACKAGE}");run_ORFquant(for_ORFquant_file = {params.for_ORFquantfile},annotation_file = "{input.annofile}", n_cores = {threads},prefix="{params.outputdir}") '
+      R -e 'library("ORFquant");run_ORFquant(for_ORFquant_file = {params.for_ORFquantfile},annotation_file = "{input.annofile}", n_cores = {threads},prefix="{params.outputdir}") '
         
       """
 ######## Here loading ORFquant can be done directly within R after installing it.

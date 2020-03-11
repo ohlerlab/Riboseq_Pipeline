@@ -1,8 +1,8 @@
 #note that file paths are relative to the pipeline directory
-root: "/fast/AG_Ohler/dharnet/Riboseq_Pipeline"
-REF_orig: "../ext_data/genome/GRCh38.primary_assembly.genome.fa"
-GTF_orig: "../ext_data/annotation/gencode.v30.primary_assembly.annotation.gtf"
-Contam: "../ext_data/contaminants.fa"
+root: "/fast/AG_Ohler/Eelco/Riboseq_Pipeline/"
+REF_orig: "../Genomes/GRCh38.primary_assembly.genome.fa"
+GTF_orig: "../Genomes/gencode.v30.primary_assembly.annotation.gtf"
+Contam: "../Genomes/contaminants.fa"
 collapse_reads_script: "../src/pipeline_scripts/collapse_reads.pl"
 MINREADLENGTH: 18
 MAXREADLENGTH: 100
@@ -16,8 +16,8 @@ STARTCODTRIM: 15
 STOPCODTRIM: 5
 ADAPTERSEQ: "TGGAATTCTCGGGTGCCAAGG"
 SPECIES: "HEK"
-RIBOSEQCPACKAGE: "../Applications/RiboseQC/"
-ORFquantPACKAGE: "../Applications/ORFquant/"
+RIBOSEQCPACKAGE: "../Applications/RiboseQC"
+ORFquantPACKAGE: "../Applications/ORFquant"
 FILT_RIBO_FOLDER: "filter_reads"
 TRIM_IDS: False
 no_UMIs: True
