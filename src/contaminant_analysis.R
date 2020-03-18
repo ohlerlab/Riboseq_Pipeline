@@ -16,13 +16,12 @@ stopifnot((contam_headers_df[['contam_id']]==(1:nrow(contam_headers_df))))
 #read in our idx files
 idxfiles <- Sys.glob('pipeline/filter_reads/*/*.idxtmp')
 
-#idxfile <- 'pipeline/filter_reads/RNA_PRE/RNA_PRE_1.fastq.gz.idxtmp'
 idxfiles%<>%setNames(.,basename(dirname(.)))
+idxfile <- idxfiles[1]
 
 samples_idx <- idxfiles%>%map_df(.id='sample',function(idxfile){
 	sample_idx <- fread(idxfile) %>%
-		arrange(- V3)%>%
-		set_colnames(c('seq','length','reads','unmapped'))
+		arrange(- V3)%>%		set_colnames(c('seq','length','reads','unmapped'))
 	#extract our id from the headers
 	sample_idx%<>%filter(seq!='*')
 	sample_idx%<>%mutate(contam_id = str_extract(seq,'^\\d+')%>%as.numeric)
@@ -36,16 +35,26 @@ samples_idx <- idxfiles%>%map_df(.id='sample',function(idxfile){
 	# sample_idx%<>%mutate(frac = reads / alignlogvect['total'])
 	#now categorize
 	sample_idx <- sample_idx%>%
+		mutate(mt_rRNA =header%>%str_detect(regex(ignore_case=T,'chrM.*MT-RNR')))%>%
 		mutate(rRNA =header%>%str_detect(regex(ignore_case=T,'rRNA|(ribosomal RNA)')))%>%
 		mutate(tRNA =header%>%str_detect(regex(ignore_case=T,'(transfer RNA)|tRNA')))%>%
-		mutate(miRNA =header%>%str_detect(regex(ignore_case=T,'microRNA|miR\\-|MIR\\d+|miRt\\d\\w')))%>%
-		mutate(snoRNA =header%>%str_detect(regex(ignore_case=T,'(small nucleolar)|snoRNA|_snR\\d{0,2}|SNOR|snoU\\d+|snoR\\d{1,4}|(Zm|_|HvU)U\\d{1,2}|MTU\\d{1,2}')))%>%
+		mutate(miRNA =header%>%str_detect(regex(ignore_case=T,'_MIR\\d+\\\\w|_MIR\\d+\\-\\d$|_MIR\\d+$|microRNA|miR\\-|MIRLET\\w\\dMIR\\d+|miRt\\d\\w')))%>%
+		mutate(snoRNA =header%>%str_detect(regex(ignore_case=T,'(small nucleolar)|snoRNA|_snR\\d{0,2}|SNOR|snoU\\d+|snoR\\d{1,4}|(Zm|_|HvU)U\\d{1,2}|MTU\\d{1,2}'		)))%>%
+		mutate(snRNA =header%>%str_detect(regex(ignore_case=T,'(small nuclear)|LINC00910')))%>%
+		mutate(SCARNA =header%>%str_detect(regex(ignore_case=T,'SCARNA\\d+$')))%>%
+		mutate(RPI_barcode =header%>%str_detect(regex(ignore_case=T,'RPI\\d+$')))%>%
 		mutate(spikein =header%>%str_detect(regex(ignore_case=T,'ERCC')))
+	contamtypecols = sample_idx%>%select(-(seq:header))%>%colnames
+	
+	noncat=filter_at(sample_idx,vars(all_of(contamtypecols)),all_vars(!.))
+
+    noncat%>%select(-one_of(contamtypecols))%>%arrange(desc(reads))%>%head
+
 	#test most things have a category above
-	stopifnot(sample_idx%$%	{sum(reads[tRNA|rRNA|miRNA|snoRNA|spikein])/sum(reads)}%>%`>`(.95))	
 	#
-	if(sample_idx[,c('tRNA','rRNA','miRNA','snoRNA','spikein')]%>%rowSums%>%`>`(0)%>%mean%>%`>`(.95)%>%not){
-		stop('less than 95% of contaminants fall in the unkown category')
+	uncatfrac <- sum(noncat$reads)/sum(sample_idx$reads)
+	if(uncatfrac > 0.05){
+		stop('more than 5% of contaminants fall in the unkown category')
 	}
 	if(sample_idx[,c('tRNA','rRNA','miRNA','snoRNA','spikein')]%>%rowSums%>%`<=`(1)%>%all%>%not){
 		stop('some of these are categorized in two bins, you need to adjust')
