@@ -1,6 +1,6 @@
 #! /bin/bash
 #$ -cwd #start from current directory
-#$ -l h_vmem=20G -l h_rt=48:00:00 -l os=centos7 -pe smp 2
+#$ -l m_mem_free=20G -l h_rt=48:00:00 -l os=centos7 -pe smp 2
 #$ -V #export all the environmental variables into the context of the job
 #$ -j yes #merge the stderr with the stdout
 #$ -o logs/ #stdout, job log
