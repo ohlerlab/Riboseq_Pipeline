@@ -285,7 +285,7 @@ rule number_contaminants:
       library(Biostrings); 
       seq = readDNAStringSet("{input.contaminants}");
       seq = unique(seq);
-      seq = setNames(seq,paste0(seq_along(.),"_",names(.)));
+      seq = setNames(seq,paste0(seq_along(seq),"_",names(seq)));
       writeXStringSet(seq,"{output}");
       write.table(col.names=F,row.names=F,data.frame(names(seq)),"tRNA_rRNA_index.names.txt");
     ' 
