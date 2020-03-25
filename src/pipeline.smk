@@ -301,6 +301,7 @@ rule make_trna_rrna_indices:
     outprefix = lambda wc,output: output[0].replace('/tRNA_rRNA_index.done',''), 
   shell: r"""
     STAR \
+    
     --runThreadN {threads} \
     --runMode genomeGenerate \
     --genomeDir {params.outprefix} \
@@ -1122,11 +1123,12 @@ rule make_riboseqc_anno:
   shell:r"""
     set -x
     awk -vOFS="\t" '{{print $1,0,$2}}' {REF}.fai | bedtools intersect -b - -a {GTF} > {params.gtfmatchchrs} 
+    R -e 'if (! "RiboseQC" %in% installed.packages()) devtools::install("{RIBOSEQCPACKAGE}",upgrade="never")'
     mkdir -p $(dirname {output[0]})
-    R -e 'library("RiboseQC"); prepare_annotation_files(annotation_directory=".",gtf_file="{params.gtfmatchchrs}",annotation_name="{params.annobase}",forge_BS=FALSE, genome_seq=FaFile("{REF}"))'
+    R -e 'devtools::load_all("{RIBOSEQCPACKAGE}");args(prepare_annotation_files) ;prepare_annotation_files(annotation_directory=".",gtf_file="{params.gtfmatchchrs}",annotation_name="{params.annobase}",forge_BS=FALSE, genome_seq=FaFile("{REF}"))'
  """
 
-#R -e 'if (! "RiboseQC" %in% installed.packages()) devtools::install("{RIBOSEQCPACKAGE}",upgrade="never")'
+
 ####################################################################################################
 ####################################################################################################
 ####################################################################################################
@@ -1163,7 +1165,7 @@ rule run_riboseqc:
          set -x
          mkdir -p {params.outname}
          mkdir -p riboseqc/reports/{wildcards.sample}
-         R -e 'library("RiboseQC");RiboseQC_analysis("{params.annofile}", bam="{input.bam}",rescue_all_rls=TRUE,dest_names="{params.outname}", genome_seq = "{REF}", report_file="{params.report_file}")'
+         R -e 'devtools::load_all("{RIBOSEQCPACKAGE}");RiboseQC::RiboseQC_analysis("{params.annofile}", bam="{input.bam}",rescue_all_rls=TRUE,dest_names="{params.outname}", genome_seq = "{REF}", report_file="{params.report_file}")'
      """
 
 rule segment_periodicity:
@@ -1184,7 +1186,9 @@ rule run_ORFquant:
   shell:r"""
     set -ex
       mkdir -p {params.outputdir}
-      R -e 'library("ORFquant");run_ORFquant(for_ORFquant_file = {params.for_ORFquantfile},annotation_file = "{input.annofile}", n_cores = {threads},prefix="{params.outputdir}") '
+      R -e 'if (! "ORFquant" %in% installed.packages()) devtools::install("{ORFquantPACKAGE}",upgrade="never")'
+
+      R -e 'devtools::load_all("{ORFquantPACKAGE}");run_ORFquant(for_ORFquant_file = {params.for_ORFquantfile},annotation_file = "{input.annofile}", n_cores = {threads},prefix="{params.outputdir}") '
         
       """
 ######## Here loading ORFquant can be done directly within R after installing it.
@@ -1210,8 +1214,7 @@ rule mappability_reads:
   #create fastas from a bed file, stick together every second line, generate the tiles of kmer size, modify the names of hte
   #tiles, and then finally turn them into fastq format
 
-  cat {output}.trsizes \
-    | awk '{{print $1"\t"1"\t"$2}}' \
+  cat {output}.trsizes \s   | awk '{{print $1"\t"1"\t"$2}}' \
     | bedtools getfasta -s -fi {RNAFASTA} -bed -  \
     | sed '$!N;s/\n/ /' \
     | perl -lane '$i=0;while($i<=(length($F[1])-{wildcards.kmer})){{print $F[0] , "$i\n", substr $F[1],$i,{wildcards.kmer} ; $i = $i +1}}' \

@@ -35,3 +35,10 @@ Running the pipeline consist of _ main steps
 	find /data/ohler/seqData/819-836/RiboFP_rRNA_depletion_test/ -iname '*fastq.gz' | grep R1  | xargs -I{} rsync -avshP {} input/
 #make a read_files.csv - note that the sed call there does some redex surgery on the file names, modify it, and the rest of the code, as needed to deal with your files and directory structure
     (head -n1 src/read_files.csv.example ; find /data/ohler/seqData/819-836/RiboFP_rRNA_depletion_test/ -iname '*fastq.gz' | grep R1  | while read f ; do  f=$(pwd)/input/$(basename $f);echo $(basename $f | sed 's/_S[0-9]_R[0-9]_.*fastq.gz//' )","$f ; done ) | tee /dev/stderr  > src/read_files.csv
+
+
+
+#code to check cutaddapt workedd
+    ```grep Summary -A7 pipeline/cutadapt_reads/*/*fastq.gz.cutadaptstats.txt```
+#code to see how many reads lost to collaps_reads
+```Sys.glob('pipeline/collapse_reads/*/*.fastq.gz.collreadstats.txt')%>%setNames(.,basename(dirname(.)))%>%map(readLines)%>%map(head,4)%>%map(tail,2)%>%map(str_extract,'\\d+')%>%simplify2array%>%t%>%set_colnames(c('input','uniq'))%>%as.data.frame(stringsAsFactors=F)%>%rownames_to_column('sample')%>%mutate(unique = round(as.numeric(uniq)/as.numeric(input),3))```
