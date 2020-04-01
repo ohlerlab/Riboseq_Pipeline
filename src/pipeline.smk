@@ -78,7 +78,7 @@ for i in seqfilesdf.file: assert Path(i).stat().st_size > 100, "This file isn't 
 #seqfilesdf.to_csv(config['sample_files'])
 
 #make sure our ids and files look ok
-assert set(seqfilesdf.sample_id) == set(sampledf.sample_id), "Sample IDs need to be setequal in "+config['sample_files']+" and "+config['sample_parameter'] +": \n"+"seqfile ids " + seqfilesdf.sample_id[0:3] + "... \n" +"seqfile ids " + sampledf.sample_id[0:3] + "... "
+assert set(seqfilesdf.sample_id) == set(sampledf.sample_id), "Sample IDs need to be setequal in "+config['sample_files']+" and "+config['sample_parameter'] +": \n"+"seqfile ids " + str(seqfilesdf.sample_id[0:3]) + "... \n" +"seqfile ids " + str(sampledf.sample_id[0:3]) + "... "
 
 for sample in sampledf.sample_id:
   for f in seqfilesdf.loc[[sample],'file']:
@@ -206,7 +206,6 @@ ADAPTERSEQ=config['ADAPTERSEQ']
 rule cutadapt_reads:
   input: 'preprocessed_reads/{sample}/{fastq}'
   output: 'cutadapt_reads/{sample}/{fastq}'
-  #conda: '../envs/cutadapt'
   log: 'cutadapt_reads/{sample}/{fastq}.cutadaptstats.txt'
   shell: """    
        set -ex
@@ -320,8 +319,9 @@ rule filter_tRNA_rRNA:
   shell: r"""
     #set -evx
     set -x
-    [ -f {params.outdir} ] && rm -rf {params.outdir}
-   
+
+	if [ -d "{params.outdir}" ]; then rm -Rf {params.outdir}; fi
+
     mkdir -p {params.outdir}
 
     STAR \
@@ -785,13 +785,13 @@ rule hisat:
 
   
 rrna_intervals = 'qc/picard_rrna_intervals.txt'
-refflat = snakedir/ 'qc' / Path(GTF).with_suffix('.refflat').name
+refflat = snakedir / 'qc' / Path(GTF).with_suffix('.refflat').name
 #refflat = snakedir/ 'qc' / Path(config['GFF_orig']).with_suffix('.refflat').name
 
 rule make_picard_files:
   input: GTF=GTF,bam=ALIGNER_TO_USE+'/data/'+samples[0]+'/'+samples[0]+'.bam'
   output: intervals=rrna_intervals,refflat=refflat
-  #conda: '../envs/picard'
+  conda: '../envs/gtftogenepred'
   shell:r"""
         set -x 
           
@@ -924,7 +924,7 @@ rule multiqc:
 
 
       # 'sample_file.txt'
-  #conda: '../envs/multiqc'
+  conda: '../envs/multiqc'
   params: 
     multiqcscript = config['multiqcscript'],
     sample_reads_file=config['sample_files'],
