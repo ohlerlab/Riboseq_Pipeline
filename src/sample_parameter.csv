@@ -1,10 +1,12 @@
 sample_id,library_layout,read_pattern,protocol,fragment_length_mean,fragment_length_sd,group,assay,fraction
-total_1,SINGLE, -f *fastq.gz,no,150,20,riboPOOLs_27_30nt,ribo,27_30nt
-riboPOOLs_27_30nt_2,SINGLE, -f *fastq.gz,no,150,20,riboPOOLs_27_30nt,ribo,27_30nt
-RiboZero_20nt_1_2,SINGLE, -f *fastq.gz,no,150,20,RiboZero_20nt,ribo,20nt
-RNaseH_27_30nt_1,SINGLE, -f *fastq.gz,no,150,20,RNaseH_27_30nt,ribo,27_30nt
-riboPOOLs_27_30nt_1,SINGLE, -f *fastq.gz,no,150,20,riboPOOLs_27_30nt,ribo,27_30nt
-RiboZero_27_30nt_1,SINGLE, -f *fastq.gz,no,150,20,RiboZero_27_30nt,ribo,27_30nt
-RiboZero_27_30nt_2,SINGLE, -f *fastq.gz,no,150,20,RiboZero_27_30nt,ribo,27_30nt
-RNaseH_27_30nt_2,SINGLE, -f *fastq.gz,no,150,20,RNaseH_27_30nt,ribo,27_30nt
-RiboZero_56_60nt_1_2,SINGLE, -f *fastq.gz,no,150,20,RiboZero_56_60nt,ribo,56_60nt
+ribo_mock_2,SINGLE, -f *fastq.gz,no,150,20,Ebp1_riboseq_mock,ribo,mock
+ribo_mock_3,SINGLE, -f *fastq.gz,no,150,20,Ebp1_riboseq_mock,ribo,mock
+ribo_si_1,SINGLE, -f *fastq.gz,no,150,20,Ebp1_riboseq_si,ribo,si
+ribo_si_2,SINGLE, -f *fastq.gz,no,150,20,Ebp1_riboseq_si,ribo,si
+ribo_si_3,SINGLE, -f *fastq.gz,no,150,20,Ebp1_riboseq_si,ribo,si
+rnaseq_mock_1,SINGLE, -f *fastq.gz,no,150,20,Ebp1_rnaseq_mock,total,mock
+rnaseq_mock_2,SINGLE, -f *fastq.gz,no,150,20,Ebp1_rnaseq_mock,total,mock
+rnaseq_mock_3,SINGLE, -f *fastq.gz,no,150,20,Ebp1_rnaseq_mock,total,mock
+rnaseq_si_1,SINGLE, -f *fastq.gz,no,150,20,Ebp1_rnaseq_si,total,si
+rnaseq_si_2,SINGLE, -f *fastq.gz,no,150,20,Ebp1_rnaseq_si,total,si
+rnaseq_si_3,SINGLE, -f *fastq.gz,no,150,20,Ebp1_rnaseq_si,total,si

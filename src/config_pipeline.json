@@ -1,7 +1,7 @@
 {
     "__default__":
     {
-        "m_mem_free": "4g",
+        "h_vmem": "4g",
         "h_rt": "4:00:00",
         "pe": "smp 4",
         "os": "centos7",
@@ -13,81 +13,81 @@
 
     "collapse_reads":
     {
-        "m_mem_free": "8G",
+        "h_vmem": "8G",
         "pe": "smp 4"
     },
     "readlenfilt":
     {
-        "m_mem_free": "8G",
+        "h_vmem": "8G",
         "pe": "smp 4"
     },
     "run_riboseqc":
     {
-        "m_mem_free": "10G",
+        "h_vmem": "10G",
         "pe": "smp 4"
     },
     "cdsmax":
     {
-        "m_mem_free": "8G",
+        "h_vmem": "8G",
         "pe": "smp 4"
     },
     "collapse_reads":
     {
-        "m_mem_free": "8G",
+        "h_vmem": "8G",
         "pe": "smp 4"
     },
     "trim_reads":
     {
-        "m_mem_free": "8G",
+        "h_vmem": "8G",
         "pe": "smp 4"
     },
     "trimming":
     {
-        "m_mem_free": "2G",
+        "h_vmem": "2G",
         "h_rt": "40:00:00",
         "pe": "smp 4"
     },
     "run_riboqc":
     {
-        "m_mem_free": "16G",
+        "h_vmem": "16G",
         "h_rt": "40:00:00",
         "pe": "smp 8"
     },
     "run_ORFquant":
     {
-        "m_mem_free": "8G",
+        "h_vmem": "8G",
         "h_rt": "40:00:00",
         "pe": "smp 8"
     },
     "run_satann_group":
     {
-        "m_mem_free": "8G",
+        "h_vmem": "8G",
         "h_rt": "40:00:00",
         "pe": "smp 8"
     },
     "knit_riboqc":
     {
-        "m_mem_free": "8G",
+        "h_vmem": "8G",
         "h_rt": "40:00:00",
         "pe": "smp 1"
     },
     "make_bowtie_indices":
     {
-        "m_mem_free": "32G",
+        "h_vmem": "32G",
         "os": "centos6",
         "h_rt": "12:00:00",
         "pe": "smp 6"
     },
     "star_index":
     {
-        "m_mem_free": "32G",
+        "h_vmem": "32G",
         "os": "centos6",
         "h_rt": "12:00:00",
         "pe": "smp 8"
     },
     "star":
     {
-        "m_mem_free": "32G",
+        "h_vmem": "32G",
         "os": "centos6",
         "h_rt": "12:00:00",
         "pe": "smp 8"
@@ -95,69 +95,69 @@
     
     "gsnap":
     {
-        "m_mem_free": "32G",
+        "h_vmem": "32G",
 #"os": "centos6",
         "h_rt": "40:00:00",
         "pe": "smp 6"
     },
     "hisat":
     {
-        "m_mem_free": "32G",
+        "h_vmem": "32G",
 #"os": "centos6",
         "h_rt": "12:00:00",
         "pe": "smp 6"
     },
     "filter_tRNA_rRNA":
     {
-        "m_mem_free": "32G",
+        "h_vmem": "32G",
         "os": "centos6",
         "h_rt": "12:00:00",
         "pe": "smp 8"
     },
     "junction_star":
     {
-        "m_mem_free": "4G",
+        "h_vmem": "4G",
         "h_rt": "12:00:00",
         "pe": "smp 8"
     },
 
     "htseq":
     {
-        "m_mem_free": "4g",
+        "h_vmem": "4g",
 #"h_rt": "40:00:00",
         "pe": "smp 1"
     },
 
     "feature_counts":
     {
-        "m_mem_free": "2g",
+        "h_vmem": "2g",
 #"h_rt": "1:00:00",
         "pe": "smp 2"
     },
 
     "rsem":
     {
-        "m_mem_free": "4G",
+        "h_vmem": "4G",
         "h_rt": "40:00:00",
         "pe": "smp 8"
     },
 
     "infer_experiment":
     {
-        "m_mem_free": "2G",
+        "h_vmem": "2G",
 #"h_rt": "40:00:00",
         "pe": "smp 1"
     },
 
     "qc":
     {
-        "m_mem_free": "16G",
+        "h_vmem": "16G",
 #"h_rt": "40:00:00",
         "pe": "smp 1"
     },
     "dupradar":
     {
-        "m_mem_free": "4g",
+        "h_vmem": "4g",
 #"h_rt": "40:00:00",
         "pe": "smp 8"
     }

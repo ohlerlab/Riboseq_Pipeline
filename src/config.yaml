@@ -1,8 +1,8 @@
 #note that file paths are relative to the pipeline directory
-root: "/fast/AG_Ohler/dharnet/Riboseq_Pipeline"
-REF_orig: "../ext_data/genome/GRCh38.primary_assembly.genome.fa"
-GTF_orig: "../ext_data/annotation/gencode.v30.primary_assembly.annotation.gtf"
-Contam: "../ext_data/contaminants.fa"
+root: "/fast/work/groups/ag_ohler/dharnet/Ebp1_Riboseq/pipeline"
+REF_orig: "../../cortexomics/pipeline/GRCm38.p5.genome.fa.gz"
+GTF_orig: "../../cortexomics/annotation/gencode.vM12.annotation.gtf"
+Contam: "../../cortexomics/ext_data/contaminants.fa"
 collapse_reads_script: "../src/pipeline_scripts/collapse_reads.pl"
 MINREADLENGTH: 18
 MAXREADLENGTH: 100
