@@ -1,0 +1,325 @@
+---
+title: "Meoisis Ribo-seq Clustering"
+output: 
+ html_notebook:
+  toc: yes
+---
+  
+# Clustering - Zea Mays Meoisis Riboseq data
+  
+# Setup
+  
+  ```{r loadinglibraries, include=FALSE, echo=FALSE, eval=T}
+knitr::opts_chunk$set(root.dir = here::here(),eval=TRUE,cache=FALSE,echo=FALSE,warning = FALSE,message = FALSE,include=TRUE,
+                      fig.width =7,fig.height=7,out.width=700,out.height=700,dev='svg')
+
+library(rmarkdown)
+library(knitr)
+library(here)
+library(magrittr)
+library(stringr)
+library(ggplot2)
+library(dbscan)
+
+dir.create(here('data'),showWarnings=F)
+dir.create(here('R_cache'),showWarnings=F)
+
+base::source(here('src/Rprofile.R'))
+
+```
+
+```{r foo, include=FALSE, echo=FALSE, eval=T,cache=F}
+message('foo')
+```
+
+```{r dds, include=FALSE, echo=FALSE, eval=T}
+
+message('foo')
+
+#this perl creates a file with unique gene_id, gene_name in pairs, faster than loading the whole gtf if it's big
+# perl -lane '/gene_name\W+(\w+)\W/ ;my $a=$1;/gene_id\W+(\w+)\W/; print($a,"\t",$1)' <(cat  pipeline/genes.chrnm.gtf) | uniq | sort | uniq > pipeline/gid_2_gname.txt
+# gtf <- here('pipeline/genes.chrnm.gtf')
+# anno <- projmemoise(function(gtf){rtracklayer::import(gtf)})(gtf)
+gid2gname <- fread(here('data/gid_2_gname.txt'))
+
+#read in the sample_parameter file from the piepline
+sampdf <- fread(here('src/sample_parameter.csv'))%>%
+  select(-(library_layout:fragment_length_sd))%>%
+  as.data.frame%>%set_rownames(.,.$sample_id)
+#use the factor ordering in the sample_parameters file - by default it gets
+sampdf <- sampdf%>%mutate_if(is_character,as_factor)
+sampdf$assay%<>%tolower%>%as_factor
+levels(sampdf$assay) <- c('total','ribo')
+stopifnot(!any(is.na(sampdf$assay)))
+#
+if(is.null(sampdf$sample_name)) sampdf$sample_name <- sampdf$sample_id
+message('foo')
+#read the counts data - this takes a while sometimes
+#file.remove(here('data/dds.rds'))
+if(!file.exists(here('data/dds.rds'))){
+  #read in our feature count data
+  fcountfiles <- Sys.glob(here('pipeline/feature_counts/data/*/feature_counts'))
+  samples <- fcountfiles%>%dirname%>%basename
+  stopifnot(!anyDuplicated(samples))
+  stopifnot(all(samples%in%sampdf$sample_id))
+  #get a list of counts (fread does multithreaded read counting - fast)
+  counts <- fcountfiles%>%map(read_tsv)%>%map(as_tibble)
+  saveRDS(counts,here('data/counts.rds'))
+  counts <- readRDS(here('data/counts.rds'))
+  
+  #check all this lines up (can get bugs with partially complete feature counts runs)
+  countcols <- counts %>% map(colnames)%>%map_chr(7)
+  stopifnot(all(samples%in%basename(dirname(countcols))))
+  
+  for(i in seq_along(counts))assert_that(msg='fcount files all on same genes',all(counts[[1]][[1]] == counts[[i]][[1]]))
+  #create a granges object with the coordinates in the first fcounts file
+  genegr = counts[[1]]%>%transmute(
+    gene_id = Geneid,
+    seqnames=str_extract('Chr','^[^;]+'),
+    start = str_extract(Start,'^[^;]+')%>%as.numeric,
+    end = str_extract(End,'[^;]+$')%>%as.numeric,
+    strand = str_extract(Strand,'^[^;]+'),
+  )
+  #coerce from df to GRanges
+  genegr = GRanges(genegr)
+  #add the gene name from the gid_2_gname file 
+  genegr$gene_name <- gid2gname[[2]][match(genegr$gene_id,gid2gname[[1]])]
+  #extract the counts from the list of fcounts files 
+  countmat <- counts%>%map(7)%>%bind_cols%>%set_colnames(samples)
+  #now combine ranges, metadata, exp data and sample data in a Bioconductor object
+  sampdf%<>%mutate_if(is.character,as_factor)%>%mutate(assay=factor(assay,levels=c('total','ribo')))
+  
+  se <-   SummarizedExperiment(assays=as.matrix(countmat),
+                               rowRanges=genegr,
+                               colData= sampdf[match(colnames(countmat),sampdf$sample_id),]
+  )
+  #made a deseq object out of this with the design.
+  dds <- DESeqDataSet(se, ~ 1)
+  
+  
+  
+  
+  rownames(dds) <- rowData(dds)$gene_id
+  #rm(counts);gc()
+  rownames(colData(dds)) <- colData(dds)$sample_id
+  saveRDS(dds,here('data/dds.rds'))
+}else{
+  dds <-readRDS(here('data/dds.rds'))
+}
+cat('successfully loaded  countdata and annotation')
+stopifnot(exists('sampdf'))
+```
+
+
+```{r get normalized counts}
+#you might want to use vst if there's a lot of data, for speed
+dir.create(here('data'))
+if(!file.exists(here('data/normcounts.rds'))){
+  
+  normfunc <- if(ncol(dds)>20) DESeq2::rlog else DESeq2::vst
+  
+  normcounts <- normfunc(dds)
+  rownames(normcounts) <- rownames(dds)
+  saveRDS(normcounts,here('data/normcounts.rds'))
+}else{
+  normcounts<-readRDS(here('data/normcounts.rds'))
+}
+cat('successfully normalized  countdata')
+```
+
+
+```{r test contrasts}
+stopifnot(exists('dds'))
+stopifnot(exists('normcounts'))
+stopifnot(exists('sampdf'))
+{
+  #do a trial run of DESeq to get the contrast names
+  design <- as.formula('~ assay * fraction')
+  design(dds) = design
+  testdds = DESeq(head(dds,2*ncol(dds)))
+  resnames = resultsNames(testdds)
+  resnames
+}
+#in this case we got
+#[1]"Intercept"               "assay_ribo_vs_total"     "mstage_LEP_vs_PRE"       "mstage_ZYGPACH_vs_PRE"
+#[5] "mstage_MII_vs_PRE"       "assayribo.mstageLEP"     "assayribo.mstageZYGPACH" "assayribo.mstageMII"
+#for resnames, so our contrasts can be....
+resnames = resultsNames(testdds)
+
+contrasts <- list(
+  "assay_ribo_vs_total" = c(0,1,0,0),
+  "fraction_si_vs_mock" = c(0,0,1,0),
+  "assayribo.fractionsi" = c(0,0,0,1)
+)
+
+#check the contrasts
+for(contrastname in names(contrasts)){
+  contrast = contrasts[[contrastname]]
+  if(is.character(contrast) & length(contrast)==1){
+    assert_that(contrast %in% resnames)
+    contrast <- as.numeric(resnames==contrast)
+  }
+  message(contrastname)
+  try({
+    results(testdds,contrast)
+  })
+}
+
+cat('tested contrasts')
+```
+
+
+```{r runcontrasts}
+#you might want to use vst if there's a lot of data, for speed
+dir.create(here('data'))
+if(!file.exists(here('data/resultslist.rds'))){
+	design(dds) <- design
+ 
+  dds <- DESeq(dds,betaPrior = F)
+  #and get the contrasts we need
+  resultslist <- lapply(contrasts,results,object = dds)
+  names(resultslist) <- names(contrasts)
+  for(i in seq_along(resultslist))resultslist[[i]]$gene_id = rowData(dds)$gene_id
+  
+  resultslist%>%map(~  table(.$padj < 0.05))
+  
+  saveRDS(resultslist,here('data/resultslist.rds'))
+  
+}else{
+  resultslist<-readRDS(here('data/resultslist.rds'))
+}
+ddstodf<- function(ddsdf)results(ddsLRT)%>%as.data.frame%>%rownames_to_column('gene_id')
+ddsLRT = DESeq(dds, test="LRT", full=~assay*fraction,reduced = ~ assay)
+changegenes <- results(ddsLRT)%>%ddstodf %>%subset%>%filter(padj < 0.05)%>%.$gene_id
+
+
+cat('successfully calculated contrasts')
+```
+
+
+# QC {.tabset}
+
+```{r qc, include = TRUE,message=TRUE,eval=T,cache=T,results='asis'}
+stopifnot(exists('dds'))
+stopifnot(exists('normcounts'))
+stopifnot(exists('sampdf'))
+
+cat("## ----dispplot------------------------------------------------------------")
+#plotDispEsts(dds)
+rld <- normcounts
+cat("## ----outlierplot---------------------------------------------------------")
+if(is.null(SummarizedExperiment::assays(dds)[["cooks"]])){
+  nulltext = "Cooks distance is meaningless\n because we only have one group per sample"
+  qplot(label=nulltext,x=1,geom='text',y=1,size=I(14))+theme_bw()
+}else{
+  boxplot(log10(SummarizedExperiment::assays(dds)[["cooks"]]), range=0, las=2)
+}
+
+cat("## ----countdist ,warning=F------------------------------------------------")
+my_counts <-
+  DESeq2::counts(dds)%>%
+  as.data.frame() %>%
+  tibble::rownames_to_column("feature_id") %>%
+  tidyr::gather(sample_id, count, -feature_id)
+
+sample_annot <- as.data.frame(SummarizedExperiment::colData(dds))
+if(!'sample_name' %in% colnames(sample_annot)) sample_annot$sample_name<-sample_annot$sample_id
+my_counts <-
+  dplyr::left_join(my_counts, sample_annot, by = "sample_id")
+
+my_counts %>%
+  ggplot(aes(x = count + 1e-3, color = group, group = sample_name)) +
+  geom_density() +
+  scale_x_log10()
+
+my_counts %>%
+  dplyr::arrange(group) %>%
+  dplyr::mutate(sample_name = factor(sample_name, levels = unique(sample_name))) %>%
+  ggplot(aes(y = count + 1e-3, color = group, x = sample_name)) +
+  geom_violin() +
+  scale_y_log10() +
+  coord_flip()
+
+
+
+cat("## ----rlddf---------------------------------------------------------------")
+stopifnot(is(rld,'DESeqTransform'))
+
+rld_df <- assay(rld)
+
+rld_df <-
+  assay(rld) %>%
+  as.data.frame() %>%
+  tibble::rownames_to_column('feature_id') %>%
+  tibble::as_data_frame() %>%
+  tidyr::gather(sample_id, reg_log_count, -feature_id)
+
+rld_df$sample_name <- sample_annot$sample_name[match(rld_df$sample_id,colData(dds)$sample_id)]
+# rld_df <- get_reg_log_counts(dds, blind = T)
+
+rld_dispersion <-
+  rld_df  %>%
+  dplyr::group_by(feature_id) %>%
+  dplyr::summarise(mean_reg_log_count = mean(reg_log_count),
+                   sd_reg_log_count = sd(reg_log_count))
+
+rld_dispersion %>%
+  ggplot(aes(y = sd_reg_log_count, x = mean_reg_log_count)) +
+  geom_point() +
+  labs(x = "mean log regularized counts", y = "standar deviation log regularized counts")
+
+
+cat("## ----pca, cache = F, fig_width=12,fig_height=12---------------------------")
+stopifnot(colnames(rld)==colnames(dds))
+
+message('calculating PCAs')
+pca = DESeq2::plotPCA(rld,intgroup="group")
+pca = pca +
+  expand_limits(x = pca$data$PC1 %>%
+                  range %>%
+                  multiply_by(1.5)) +
+  expand_limits(y = pca$data$PC2 %>%
+                  range %>%
+                  multiply_by(1.3))
+#(pca+geom_text(aes(group),size=I(2),alpha=I(0.5))) %>% {.$layers=.$layers[-1];.+geom_point(size=I(0))} +
+#  ggtitle('PCA : labelled by samplename')
+#we also want a table with these data to pick out outliers
+pca$data %>% write_tsv(here('data/pca.tsv'))
+
+cat("## ----pca_grouplabel, fig_width=12,fig_height=12---------------------------")
+(pca+geom_text(aes(label=group),size=I(2),alpha=I(0.5)))%>%{.$layers=.$layers[-1];.+geom_point(size=I(0))}+ggtitle('PCA : labelled by group')
+
+cat("## ----pca_nolabel, fig_width=12,fig_height=12------------------------------")
+(pca+geom_text(aes(label=group),size=I(0),alpha=I(0.5)))%>%{.$layers=.$layers[-1];.+geom_point(size=I(3))}+ggtitle('PCA')
+
+
+cat("## ----heatmap-------------------------------------------------------------")
+# dual scale settings for heatmaps
+## setting values outside of the range [z_min, z_max] to the limiting values
+if(!exists('z_max')) z_max <-  3.5
+if(!exists('z_min')) z_min <- -3.5
+# colnames(rld_df) %<>% {stringr::str_replace(.,'sample_id','sample_name')}
+plot_heatmap_fluc_features(500, rld_df, z_min = z_min, z_max = z_max)
+
+my_counts%<>%group_by(sample_name)%>%
+  mutate(countclass = case_when(
+    count > 1000 ~ '> 1000',
+    count > 100 ~ '> 100',
+    count > 32 ~ '> 32',
+    count > 8 ~ '> 8',
+    count > 0 ~ '< 8',
+    count ==0 ~ ' 0 ',
+    TRUE ~ 'NA'
+  ))
+
+my_counts$countclass%<>%factor(levels=c('> 1000','> 100','> 32','> 8','< 8',' 0 '))
+stopifnot(!any(is.na(my_counts$countclass)))
+
+
+my_counts%>%
+  group_by(sample_name,countclass)%>%tally%>%spread(countclass,n)%>%.[rev(colnames(.))]%>%select(sample_name,everything())%>%kable(label='gene count classes')
+
+```
+
+qc plots above
+

@@ -1,0 +1,11 @@
+name: subread
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+dependencies:
+  - libgcc-ng=7.3.0=hdf63c60_0
+  - subread=1.6.4=h84994c4_1
+  - zlib=1.2.11=h14c3975_1004
+prefix: /fast/users/dharnet_m/work/miniconda3/envs/subread
+
