@@ -1,4 +1,5 @@
 sample_id,library_layout,read_pattern,protocol,fragment_length_mean,fragment_length_sd,group,assay,fraction
+ribo_mock_1,SINGLE, -f *fastq.gz,no,150,20,Ebp1_riboseq_mock,ribo,mock
 ribo_mock_2,SINGLE, -f *fastq.gz,no,150,20,Ebp1_riboseq_mock,ribo,mock
 ribo_mock_3,SINGLE, -f *fastq.gz,no,150,20,Ebp1_riboseq_mock,ribo,mock
 ribo_si_1,SINGLE, -f *fastq.gz,no,150,20,Ebp1_riboseq_si,ribo,si

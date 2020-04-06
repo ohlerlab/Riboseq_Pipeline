@@ -1,4 +1,5 @@
 sample_id,file
+ribo_mock_1,/fast/work/groups/ag_ohler/dharnet_m/Ebp1_ribo/input/ML_UZ_026_barcode_Mock1.fastq.gz
 ribo_mock_2,/fast/work/groups/ag_ohler/dharnet_m/Ebp1_ribo/input/ML_UZ_026_barcode_Mock2.fastq.gz
 ribo_mock_3,/fast/work/groups/ag_ohler/dharnet_m/Ebp1_ribo/input/ML_UZ_026_barcode_Mock3.fastq.gz
 ribo_si_1,/fast/work/groups/ag_ohler/dharnet_m/Ebp1_ribo/input/ML_UZ_026_barcode_si1.fastq.gz
