@@ -9,7 +9,7 @@ output:
   
 # Setup
   
-  ```{r loadinglibraries, include=FALSE, echo=FALSE, eval=T}
+```{r loadinglibraries, include=FALSE, echo=FALSE, eval=T}
 knitr::opts_chunk$set(root.dir = here::here(),eval=TRUE,cache=FALSE,echo=FALSE,warning = FALSE,message = FALSE,include=TRUE,
                       fig.width =7,fig.height=7,out.width=700,out.height=700,dev='svg')
 
@@ -28,34 +28,33 @@ base::source(here('src/Rprofile.R'))
 
 ```
 
-```{r foo, include=FALSE, echo=FALSE, eval=T,cache=F}
-message('foo')
+
+```{r}
+l2fc_threshold <- 0.32
 ```
 
 ```{r dds, include=FALSE, echo=FALSE, eval=T}
 
-message('foo')
 
 #this perl creates a file with unique gene_id, gene_name in pairs, faster than loading the whole gtf if it's big
 # perl -lane '/gene_name\W+(\w+)\W/ ;my $a=$1;/gene_id\W+(\w+)\W/; print($a,"\t",$1)' <(cat  pipeline/genes.chrnm.gtf) | uniq | sort | uniq > pipeline/gid_2_gname.txt
 # gtf <- here('pipeline/genes.chrnm.gtf')
 # anno <- projmemoise(function(gtf){rtracklayer::import(gtf)})(gtf)
-gid2gname <- fread(here('data/gid_2_gname.txt'))
+gid2gname <- fread(here('data/gid_2_gname.txt'))%>%set_colnames(c('gene_name','gene_id'))
 
 #read in the sample_parameter file from the piepline
 sampdf <- fread(here('src/sample_parameter.csv'))%>%
   select(-(library_layout:fragment_length_sd))%>%
   as.data.frame%>%set_rownames(.,.$sample_id)
 #use the factor ordering in the sample_parameters file - by default it gets
+
 sampdf <- sampdf%>%mutate_if(is_character,as_factor)
-sampdf$assay%<>%tolower%>%as_factor
-levels(sampdf$assay) <- c('total','ribo')
+sampdf$assay%<>%fct_relevel(c('total','ribo'))
 stopifnot(!any(is.na(sampdf$assay)))
 #
 if(is.null(sampdf$sample_name)) sampdf$sample_name <- sampdf$sample_id
-message('foo')
 #read the counts data - this takes a while sometimes
-#file.remove(here('data/dds.rds'))
+# file.remove(here('data/dds.rds'))
 if(!file.exists(here('data/dds.rds'))){
   #read in our feature count data
   fcountfiles <- Sys.glob(here('pipeline/feature_counts/data/*/feature_counts'))
@@ -181,19 +180,44 @@ if(!file.exists(here('data/resultslist.rds'))){
   names(resultslist) <- names(contrasts)
   for(i in seq_along(resultslist))resultslist[[i]]$gene_id = rowData(dds)$gene_id
   
-  resultslist%>%map(~  table(.$padj < 0.05))
+  ddstodf<- function(ddsdf)results(ddsLRT)%>%as.data.frame%>%rownames_to_column('gene_id')
+  ddsLRT = DESeq(dds, test="LRT", full=~assay*fraction,reduced = ~ assay)
+  changegenes <- results(ddsLRT)%>%ddstodf %>%subset%>%filter(padj < 0.05)%>%.$gene_id
+  
+  saveRDS(changegenes,here('data/changegenes.rds'))
+  
+  if(do_xtail){
+    run_xtail = function()Sys.glob(here('pipeline','xtail/*'))%>%setNames(.,basename(.)%>%str_extract(regex('(?<=xtail_).*(?=\\.tsv)')))
+#    xtailcontrasts = 'fraction'
+ #   xtailfiles = run_xtail(dds)  
+    xtailfiles <- run_xtail()
+    xtailres = map_df(.id='contrast',xtailfiles,fread)
+    xtailres$isxtail = TRUE
+    xtailres$contrast = paste0('xtailTE_',xtailres$contrast)
+    
+    ddsreslist<-resultslist[!str_detect(names(resultslist),'xtail')]
+    # xtailres%<>%rename(log2FoldChange := log2fc)
+    xtailres%<>%rename(gene_id := feature_id)
+    xtailres %<>% rename(baseMean := base_mean)
+    resultslist <- c(ddsreslist,split(xtailres,xtailres$contrast))  
+  }
+
+  
+  resultslist = 
   
   saveRDS(resultslist,here('data/resultslist.rds'))
   
+  
+  
 }else{
   resultslist<-readRDS(here('data/resultslist.rds'))
+  changegenes<-readRDS(here('data/changegenes.rds'))
 }
-ddstodf<- function(ddsdf)results(ddsLRT)%>%as.data.frame%>%rownames_to_column('gene_id')
-ddsLRT = DESeq(dds, test="LRT", full=~assay*fraction,reduced = ~ assay)
-changegenes <- results(ddsLRT)%>%ddstodf %>%subset%>%filter(padj < 0.05)%>%.$gene_id
+
+cat('successfully calculated contrasts:')
+message(names(resultslist)%>%paste(collapse=' '))
 
 
-cat('successfully calculated contrasts')
 ```
 
 
@@ -322,4 +346,198 @@ my_counts%>%
 ```
 
 qc plots above
+
+
+
+
+# Differential expression
+
+```{r}
+ trim_gids <- function(df){
+    df=as.data.frame(df);
+    df%>%mutate_at(vars(matches('gene_id|feature_id')),list(~str_replace(.,'\\.\\d+','')))
+  }
+contrast = names(resultslist)[[4]]
+regdirfuncs = list(Up=identity,Down=function(x)x * -1)
+regdir='Up'
+for(contrast in names(resultslist)){
+  for(regdir in names(regdirfuncs)){
+    regdirfunc = regdirfuncs[[regdir]]
+    res = resultslist[[contrast]]%>%as.data.frame%>%trim_gids
+     
+    qplot(data = res, log10(baseMean), log2FoldChange , size=I(0.2), color= padj < 0.05)+theme_bw()+scale_color_manual(values=c('black','red'))
+    
+    
+    library(DT)
+      reg_features = res%>%filter(padj<0.05,regdirfunc(log2FoldChange) > l2fc_threshold) 
+      num_reg <- nrow(reg_features)
+      
+      cat("${regdir} regulated feature: ${num_reg}")
+
+      reg_features %>% select(-matches('contrast')) %>%
+        left_join(gid2gname%>%select(gene_id,gene_name))%>%
+        select(gene_name,gene_id,baseMean,log2FoldChange,padj,everything())%>%
+        DT::datatable(rownames = F,escape = F,extensions = 'Buttons', 
+                  options = list(
+                    dom='Bfrtip',
+                    buttons = list(
+                      list(
+                        extend='csv',
+                        buttons=c('csv'),
+                        text='download')
+                    )
+                  )
+        )
+  }
+}
+res = resultslist[[contrast]]
+res%>%filter(log10(baseMean)>4.5)
+  
+
+resultslist[[2]]%>%as.data.frame%>%filter(gene_id==tgene)%>%select(log2FoldChange)
+
+tgene = 'ENSMUSG00000029580.14'
+colData(dds)
+resultslist[[3]]%>%as.data.frame%>%filter(gene_id==tgene)%>%select(log2FoldChange)
+resultslist[[4]]%>%filter(gene_id==tgene)%>%select(contrast,log2FoldChange)
+
+resultslist[[3]]%>%as.data.frame%>%filter(gene_id==tgene)
+
+assay(normcounts)[tgene,] %>% enframe('sample_id','log_reg_count')%>%
+    arrange(sample_id)%>%
+    left_join(sampdf)%>%qplot(data=.,x=group,y=log_reg_count,geom='point')
+
+t2gene = resultslist$assay_ribo_vs_total%>%as.data.frame%>%arrange(desc(log2FoldChange))%>%.$gene_id%>%head(1)
+
+assay(normcounts)[t2gene,] %>% enframe('sample_id','log_reg_count')%>%
+    arrange(sample_id)%>%
+    left_join(sampdf)%>%qplot(data=.,x=group,y=log_reg_count,geom='point')
+
+
+t2gene = resultslist$fraction_si_vs_mock%>%as.data.frame%>%arrange(desc(log2FoldChange))%>%.$gene_id%>%head(4)%>%tail(1)
+
+assay(normcounts)[t2gene,] %>% enframe('sample_id','log_reg_count')%>%
+    arrange(sample_id)%>%
+    left_join(sampdf)%>%qplot(data=.,x=group,y=log_reg_count,geom='point')
+
+```
+
+```{r}
+
+```
+
+
+
+```{r}
+ebp1_ip_df <- bind_rows(.id='DSP',list(
+  DSP = fread(here('ext_data/1mM_DSP.csv')),
+  noDSP = fread(here('ext_data/no_DSP.csv'))
+))
+
+left_join(
+  resultslist$fraction_si_vs_mock%>%as.data.frame%>%
+    select(gene_id,transcriptional_change = log2FoldChange),
+  resultslist$xtailTE_fraction%>%
+    select(gene_id,TE_change = log2FoldChange),
+  by='gene_id'
+)%>%qplot(data=.,x=transcriptional_change,y=TE_change,geom='point')
+
+ggpubr::ggarrange(
+resultslist$xtailTE_fraction%>%qplot(data=.,x=mRNA_log2FC,y=RPF_log2FC,geom='point')+coord_cartesian(xlim=c(-4,4),ylim=c(-4,4))+theme_bw()+scale_x_continuous('Transcriptional change')+scale_y_continuous('RPF change')+geom_smooth(method='lm'),
+
+resultslist$xtailTE_fraction%>%qplot(data=.,x=mRNA_log2FC,y=log2FoldChange,geom='point')+theme_bw()+scale_x_continuous('Transcriptional change')+scale_y_continuous('TE change (xtail)')
+)
+
+
+
+
+```
+
+
+```{r}
+library(biomaRt)
+mart<-useMart('ENSEMBL_MART_ENSEMBL')
+mart<-useDataset('mmusculus_gene_ensembl',mart)
+ens_ref_gids<-biomaRt::getBM(attributes = c( "ensembl_gene_id","refseq_mrna"), 
+               filters='ensembl_gene_id', 
+               values = cds$gene_id%>%unique,
+               mart = mart)
+ens_ref_gids%>%as.data.frame%>%write_tsv(here('pipeline/ensembl2reseq.tsv'))
+
+resultslist$xtailTE_fraction%>%{lm(.$RPF_log2FC ~ .$mRNA_log2FC)}%>%confint()
+
+kocontrastname = names(resultslist)[4]
+IP_KO_mergeres<-ebp1_ip_df%>%select(gene_name=Gene_name,everything())%>%
+    full_join(resultslist[[kocontrastname]]%>%trim_gids%>%left_join(gid2gname%>%select(gene_id,gene_name),by='gene_id'),by='gene_name')
+
+qplot(data=IP_KO_mergeres%>%filter(!is.na(DSP),padj<0.05),x=log2FoldChange,log2(RPKM_ratio),alpha=I(0.2),size=I(0.2))+
+  facet_grid(DSP~.)+
+  scale_x_continuous(name=paste0('KO Fold Change: ',kocontrastname)%>%str_replace('TE_fraction','TEchange'))+
+  theme_bw()
+
+kocontrastname = names(resultslist)[2]
+IP_KO_mergeres<-ebp1_ip_df%>%select(gene_name=Gene_name,everything())%>%
+    full_join(resultslist[[kocontrastname]]%>%trim_gids%>%left_join(gid2gname%>%select(gene_id,gene_name),by='gene_id'),by='gene_name')
+
+qplot(data=IP_KO_mergeres%>%filter(!is.na(DSP),padj<0.05),x=log2FoldChange,log2(RPKM_ratio),alpha=I(0.2),size=I(0.2))+
+  facet_grid(DSP~.)+
+  scale_x_continuous(name=paste0('KO Fold Change: ',kocontrastname)%>%str_replace('TE_fraction','TEchange'))+
+  theme_bw()
+
+
+qplot(data=IP_KO_mergeres,log2(RPKM_CDS_total),log2(baseMean))+theme_bw()+ggtitle('Signal mean comparison IP vs KO experiments')
+qplot(log2(IP_KO_mergeres$RPKM_CDS_total),log2(IP_KO_mergeres$baseMean))
+cor.test(IP_KO_mergeres$log2FoldChange,log2(IP_KO_mergeres$RPKM_ratio))
+
+
+IP_KO_mergeres%>%filter(DSP=='DSP')%>%left_join(IP_KO_mergeres%>%filter(DSP=='noDSP')%>%select(gene_name,noDSP_ratio = RPKM_ratio))%>%transmute(gene_name,log2FoldChange,l2DSP_spec_RPKM_ratio=log2(RPKM_ratio) - log2(noDSP_ratio))%>%
+  qplot(data=.,x=log2FoldChange,l2DSP_spec_RPKM_ratio,alpha=I(0.2),size=I(0.2))+
+    scale_x_continuous(name=paste0('KO Fold Change: ',kocontrastname)%>%str_replace('TE_fraction','TEchange'))+
+    theme_bw()
+
+```
+
+```{r}
+base::source(here('src/gofuncs.R'))
+
+GTOGO <- select(GTOGO,gene_name,go_id,gene_id)%>%filter(gene_id %in% rownames(rld))%>%group_by(go_id)%>%filter(n()>10)
+GTOGO$gene_id%<>%str_replace('\\.\\d+$','')
+
+txnupregres <- rungo(resultslist$fraction_si_vs_mock%>%trim_gids%>%{setNames((.$log2FoldChange>0) & (.$padj<0.05),.$gene_id)},GTOGO,'CC')
+te_upregres <- rungo(
+  resultslist$xtailTE_fraction%>%trim_gids%>%{setNames((.$log2FoldChange>0) & (.$padj<0.05),.$gene_id)},GTOGO,'CC')
+
+gotables<-lapply(list(Transcriptional=resultslist$fraction_si_vs_mock,TE=resultslist$xtailTE_fraction),function(fc_df){
+  lapply(regdirfuncs,function(regdirfunc){
+    lapply(c('BP','MF','CC'),function(ont){
+      rungo(fc_df%>%trim_gids%>%{setNames((regdirfunc(.$log2FoldChange)>0) & (.$padj<0.05),.$gene_id)},GTOGO,ont)
+    })
+  })
+})
+
+plot_go_enrich(gotables[['Transcriptional']][['Up']][[2]],'elimFisher',paste0('Transcriptional ','Up','CC'))
+plot_go_enrich(teres,'elimFisher',paste0('Transcriptional ','Up','CC'))
+
+```
+
+
+```{r}
+#BiocManager::install(c('wmtsa'))
+source('https://raw.githubusercontent.com/lulab/Ribowave/1e0d61963d2d41d4e0df3faefa2c09bfe84e2278/scripts/function.R')
+my_DWPT(c(19,4,2))
+
+
+```
+Let's check and see about this mitochondrial normalisation.
+
+```{r}
+mitognames <- read_tsv('../ext_data/mitognames.tsv',col_names=F)
+
+resultslist[[4]]%>%trim_gids%>%left_join(gid2gname)%>%filter(gene_name%in%mitognames[[1]])
+
+mitognames[[1]]%in%gid2gname$gene_name
+
+
+
+```
 

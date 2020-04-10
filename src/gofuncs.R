@@ -89,7 +89,10 @@ rungo <- function(int.genes,GTOGO,my_ontology,background=NULL){
     background = names(int.genes)
     int.genes = names(int.genes)[int.genes]
   } 
-  if(!is.null(background)) GTOGO <- GTOGO%>%filter(gene_id%in%background)
+  if(!is.null(background)){
+    stopifnot(mean(background %in% GTOGO$gene_id)>0.5)
+    GTOGO <- GTOGO%>%filter(gene_id%in%background)
+  }
   geneID2GO <- by(GTOGO$go_id, GTOGO$gene_id, function(x) as.character(x))
   # 
   require(topGO)
@@ -132,19 +135,28 @@ plot_go_tree <- function(toptermgotable,ont='BP',tit_postfix=''){
     as.dendrogram%>%
     plot( cex = 0.2, horiz=TRUE, main = paste0('GO Terms clustered by overlap in significant genes:\n ',ont,' ',tit_postfix))
 }
-
-#load up the go data as a matrix
-ann <- 'ext_data/go_mapping.txt'%>%fread
-GTOGO <- ann$value%>%str_split(', ')%>%tibble(go_id=.,gene_name=ann$name,gene_id=ann$name)%>%unnest
-GTOGO %<>% select(gene_name, go_id, gene_id)
-
+# 
+# #load up the go data as a matrix
+# ann <- 'ext_data/go_mapping.txt'%>%fread
+# GTOGO <- ann$value%>%str_split(', ')%>%tibble(go_id=.,gene_name=ann$name,gene_id=ann$name)%>%unnest
+# GTOGO %<>% select(gene_name, go_id, gene_id)
+# 
 
 
 
 #For a predfined list of genes
 if(!file.exists('data/GTOGO.rds')){
   require(biomaRt)
+    require(biomaRt)
+    mart<-useMart('ENSEMBL_MART_ENSEMBL')
+    mart<-useDataset('mmusculus_gene_ensembl',mart)
+    GTOGO <- biomaRt::getBM(attributes = c( "ensembl_gene_id", "go_id","external_gene_name"), mart = mart)
+    GTOGO%<>%select(gene_name=external_gene_name,go_id,ensembl_gene_id)
+    dir.create('data')
+    GTOGO%<>%rename(gene_id:=ensembl_gene_id)
+    saveRDS(GTOGO,'data/GTOGO.rds')
 
+  GTOGO<-readRDS('data/GTOGO.rds')
   saveRDS(GTOGO,'data/GTOGO.rds')
 }else{
   GTOGO<-readRDS('data/GTOGO.rds')

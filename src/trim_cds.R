@@ -65,5 +65,3 @@ mcols(trimmed_cds) <- testcds[trimmed_cds$xHits]%>%.[IntegerList(as.list(rep(1,l
 names(trimmed_cds)<-NULL
 
 trimmed_cds%>%export(gtf%>%str_replace('.gtf$','.trimmed.gtf'))
-
-
