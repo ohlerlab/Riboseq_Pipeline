@@ -1,26 +1,32 @@
 #note that file paths are relative to the pipeline directory
-root: "/fast/AG_Ohler/dharnet/Riboseq_Pipeline"
-REF_orig: "../ext_data/genome/GRCh38.primary_assembly.genome.fa"
-GTF_orig: "../ext_data/annotation/gencode.v30.primary_assembly.annotation.gtf"
-Contam: "../ext_data/contaminants.fa"
+root: "/fast/work/groups/ag_ohler/dharnet_m/Liuetal/"
+REF_orig: "../../genomes/hg19.fa"
+GTF_orig: "/fast/work/groups/ag_ohler/dharnet_m/Splicing_Lausanne/ext_data/annotation/gencode.v24lift37.annotation.gtf"
+GFF_orig: "/fast/work/groups/ag_ohler/dharnet_m/Splicing_Lausanne/ext_data/annotation/gencode.v24lift37.annotation.gff3"
+Contam: "/fast/work/groups/ag_ohler/dharnet_m/Splicing_Lausanne/contaminants/contaminants.fa"
 collapse_reads_script: "../src/pipeline_scripts/collapse_reads.pl"
+#REMOVE8NBIN: "../src/pipeline_scripts/remove8N_twoarg.pl"
+REMOVE8NBIN: "../src/pipeline_scripts/remove8N_twoarg.pl"
 MINREADLENGTH: 18
 MAXREADLENGTH: 100
 QUALLIM: 20
-REMOVE8NBIN: "../remove8N.pl"
+CUTADAPTBIN: "~/work/bin/cutadapt"
+REMOVE8NBIN: "~/work/bin/remove8N_twoarg.pl"
 sample_files: "../src/read_files.csv"
 sample_parameter: "../src/sample_parameter.csv"
 multiqcscript: 'multiqc'
 rnaseqpipescriptdir: '../src/pipeline_scripts/'
 STARTCODTRIM: 15
 STOPCODTRIM: 5
-ADAPTERSEQ: "TGGAATTCTCGGGTGCCAAGG"
-SPECIES: "HEK"
-RIBOSEQCPACKAGE: "../Applications/RiboseQC/"
-ORFquantPACKAGE: "../Applications/ORFquant/"
-FILT_RIBO_FOLDER: "filter_reads"
-TRIM_IDS: False
-no_UMIs: True
-FILT_RNA_FOLDER: 'preprocessed_reads'
+ADAPTERSEQ: "CTGTAGGCACCATCAAT"
+SPECIES: "Homo.Sapiens"
+RIBOSEQCPACKAGE: "../../Ebp1_ribo/Applications/RiboseQC/"
+ORFquantPACKAGE: "../../Ebp1_ribo/Applications/ORFquant/"
+
 RNALENRANGE: "20_1000"
 RIBOLENRANGE: "25_31"
+
+FILT_RIBO_FOLDER: "filter_reads"
+TRIM_IDS: True
+
+
