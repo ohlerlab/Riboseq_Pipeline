@@ -30,6 +30,9 @@ library(limma)
 library(broom)
 library(hashmap)
 
+
+
+
 safe_hashmap<-setRefClass("Safe_Rcpp_Hashmap",
       contains="Rcpp_Hashmap",
       inheritPackage=TRUE
@@ -69,10 +72,11 @@ qs<-checkmate::qassert
 
 
 # ###memoise
-project_cache=here::here('R_cache')
-if(!exists('project_cache'))project_cache=tempdir()
+project_cache=here::here('R_cache')%T>%dir.create(showWarnings=F)
+message('current cache size:')
 message(system(str_interp('du -h ${project_cache}'),intern=T))
 mycache=memoise::cache_filesystem(project_cache)
+message(str_interp('Number of keys: ${length(mycache$keys())}'))
 
 myclearcache=function() system(str_interp('rm -rf ${project_cache}'))
 
@@ -163,8 +167,13 @@ safe_left_join = function (x, y, by = NULL, verbose = TRUE,allow_missing=FALSE,a
 }
 
 is_offchr<-function(gr,si){
-  seqinfo(gr)<-si
-  end(gr) > seqlengths(gr)[as.character(seqnames(gr))]
+  if(is(gr,'GenomicRangesList')){
+   (end(gr) > split(seqlengths(gr)[as.character(unlist(seqnames(gr)))],gr@partitioning) ) %in% TRUE
+  }else{
+    seqinfo(gr)<-si
+    end(gr) > seqlengths(gr)[as.character(seqnames(gr))]
+
+  }
 }
 is_out_of_bounds <- function(gr,si = seqinfo(gr)){
   start(gr)<1 | is_offchr(gr,si) 
@@ -620,13 +629,13 @@ resize_grl_startfix<-function(grl,width){
 str_order_grl<-function(grl){order( start(grl)*(((strand(grl)!='-')+1)*2 -3) )}
 sort_grl_st <- function(grl)grl[str_order_grl(grl),]
 resize_grl_endfix <- function(grl,width){
-  grl = invertStrand(grl)
   grl = invertStrand(grl)%>%sort_grl_st
   
   grl = resize_grl_startfix(grl,width)
   invertStrand(grl)%>%sort_grl_st
 }
 resize_grl <- function(grl,width,fix='start',check=TRUE){
+  stopifnot(all(width>0))
   assert_that(all(all(diff(str_order_grl(grl))==1) ),msg = "grl needs to be 5'->3' sorted")
   if(fix=='start'){
     grl = resize_grl_startfix(grl,width)
@@ -663,6 +672,79 @@ trim_grl <- function(grl,bp,end='tp'){
   }
 }
 
+setGeneric('apply_psite_offset',function(offsetreads,offset) strandshift(offsetreads,offset))
+setMethod('apply_psite_offset','GAlignments',function(offsetreads,offset){
+  if(is.character(offset)){
+    offset = rowSums(as.matrix(mcols(offsetreads)[,offset]))
+  } 
+  if(length(offset)==1) offset = rep(offset,length(offsetreads))
+  isneg <-  as.logical(strand(offsetreads)=='-')
+  offsetreads[!isneg] <- qnarrow(offsetreads[!isneg],start=offset[!isneg]+1,end = offset[!isneg]+1)
+  ends <- qwidth(offsetreads[isneg])-offset[isneg]
+  offsetreads[isneg] <- qnarrow(offsetreads[isneg],start=ends,end = ends  ) 
+  offsetreads
+})
+
+fp <-function(gr)ifelse(strand(gr)=='-',end(gr),start(gr))
+tp <-function(gr)ifelse(strand(gr)=='-',start(gr),end(gr))
+strandshift<-function(gr,shift) shift(gr , ifelse( strand(gr)=='-',- shift,shift))
+
+get_genomic_psites <- function(bam,windows,offsets,mapqthresh=200) {
+  require(GenomicAlignments)
+  riboparam<-ScanBamParam(scanBamFlag(isDuplicate=FALSE,isSecondaryAlignment=FALSE),mapqFilter=mapqthresh,which=windows)
+  reads <- readGAlignments(bam,param=riboparam)
+  #
+  if(is.null(offsets)){
+  mcols(reads)$offset <- floor(qwidth(reads)/2)
+  }else{
+    mcols(reads)$offset <- 
+      data.frame(length=qwidth(reads),compartment='nucl')%>%
+      safe_left_join(offsets,allow_missing=TRUE)%>%.$offset
+  }
+  #
+  reads <- reads%>%subset(!is.na(mcols(reads)$offset))
+  # 
+  mcols(reads)$length <- width(reads)
+  reads%<>%subset(!is.na(offset))
+  psites <- apply_psite_offset(reads,c('offset'))%>%as("GRanges")
+  mcols(psites)$length <- mcols(reads)$length   
+  psites
+}
+#exonsexp->exons_grl
+# cds[bestcds]->trspacegr
+spl_mapFromTranscripts <- function(trspacegr,exons_grl){
+
+  exons_tr<-exons_grl%>%unlist%>%mapToTranscripts(exons_grl)%>%.[names(.)==seqnames(.)]
+  # grlcs = exons_grl%>%sort_grl_st%>%width%>%cumsum%>%IntegerList
+  
+  # grlcs%>%head%>%{pc(.,rep(1,length(.)))}
+  
+  # grlcs%>%{.[IntegerList(as.list(-elementNROWS(.)))]}
+
+  # lastelems <- elementNROWS(grlcs)%>%as.list%>%IntegerList%>%setNames(NULL)
+  # pc(rep(1,length(grlcs)),grlcs+1)[-1 * lastelems]
+
+
+  # exons_grl%>%unlist%>%.[exons_tr[subjectHits(ov)]$xHits]
+  ov <- findOverlaps(trspacegr,exons_tr)
+  # trspacegr[testpid]
+
+  # exons_grl[seqnames(trspacegr)]
+
+  # exons_grl%>%unlist%>%setNames(paste0('exon_',seq_along(.)))%>%
+
+
+  # mergeByOverlaps(trspacegr,exons_tr)
+
+  trspacegr_spl <- suppressWarnings({trspacegr[queryHits(ov)]%>%pintersect(exons_tr[subjectHits(ov)])})
+  genomic_trspacegr <- mapFromTranscripts(
+  trspacegr_spl,
+  # exons_tr[subjectHits(ov)]%>%split(.,seqnames(.))
+  exons_grl
+  )
+  genomic_trspacegr$xHits <- queryHits(ov)[genomic_trspacegr$xHits]
+  genomic_trspacegr
+}
 
 #metaplots
 
