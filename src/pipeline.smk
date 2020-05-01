@@ -1221,6 +1221,11 @@ rule mappability_reads:
 
     """
 
+rule cdstrim:
+  input: GTF
+  output: 'gid2trid.txt','trid2prid.txt','gid2prid.txt','gnm2gid.txt'
+  shell: r"""Rscript ../src/trim_cds.R"""
+  
 ################################################################################
 ########Run Rseq
 ################################################################################
