@@ -1,67 +1,61 @@
 #load the gtf
-library(rtracklayer)
-gtf = here('../cortexomics/my_gencode.vM12.annotation.gtf')
-STARTTRIMCODS <- 15
-ENDTRIMCODS <- 5
-if(!exists('gtf_gr')) gtf_gr<-import(con=gtf,format='gtf')
-# gtf_grbak <- gtf_gr
-# gtf_gr<-gtf_grbak
-
-# gtf_gr <- gtf_grbak[gtf_grbak$transcript_id%in%unique(gtf_grbak$transcript_id)[666:676],]
-# gtf_gr<-sort(gtf_gr)
-
-exons <- gtf_gr%>%subset(type=='exon')
-cds <- gtf_gr%>%subset(type=='CDS')
-
-
-
-trimlen = (STARTTRIMCODS*3) + (STARTTRIMCODS*3)
-#define longe enough ids
-longenough_ids = cds%>%split(.,.$protein_id)%>%width%>%sum%>%.[.>trimlen]%>%names
-#now subset
-cds %<>% subset(protein_id %in% longenough_ids)
-exons %<>% subset(transcript_id %in% unique(cds$transcript_id))
-genes <- gtf_gr %>% subset(type=='gene') %>% subset(gene_id %in% exons$gene_id)
-
-#select some cds regions and corresponding transciropts
-testcds <- cds%>%split(.,.$protein_id)
-testtrs <- exons%>%subset(transcript_id%in%unlist(testcds)$transcript_id)%>%split(.,.$transcript_id)
-#get start codons
-startcods <- testcds%>%revElements(.,any(strand(.)=='-'))%>%lapply('[',1)%>%GRangesList%>%unlist%>%resize(1,'start')
-endcods <- testcds%>%revElements(.,any(strand(.)=='+'))%>%lapply('[',1)%>%GRangesList%>%unlist%>%resize(1,'end')
-#map our start codons to transcript space
 library(GenomicFeatures)
-matching_trs <- testtrs[startcods$transcript_id]
-startcods_trspace <- pmapToTranscripts(startcods,matching_trs)
-endcods_trspace <- pmapToTranscripts(endcods,matching_trs)
-#this function maps granges in transcript space back to the genome, poentially creating more
-#than n ranges for n in put ranges, if they cross exon boundaries
-spl_mapFromTranscripts<-function(trspacegr,exons_grl){
-  exons_tr<-exons_grl%>%unlist%>%setNames(paste0('exon_',seq_along(.)))%>%mapToTranscripts(exons_grl)
-  ov <- findOverlaps(trspacegr,exons_tr)
-  trspacegr_spl <- suppressWarnings({trspacegr[queryHits(ov)]%>%pintersect(exons_tr[subjectHits(ov)])})
-  genomic_trspacegr <- mapFromTranscripts(
-  trspacegr_spl,
-  # exons_tr[subjectHits(ov)]%>%split(.,seqnames(.))
-  exons_grl
-  )
-  genomic_trspacegr$xHits <- queryHits(ov)[genomic_trspacegr$xHits]
-  genomic_trspacegr
+# source('src/Rprofile.R')
+fmcols <- function(grl,...){
+  with(grl@unlistData@elementMetadata,...)[start(grl@partitioning)]
+}
+fmcols_List <- function(grl,...){
+  with(grl@unlistData@elementMetadata,...)%>%split(grl@partitioning)
 }
 
-cds_trspace <- startcods_trspace
-end(cds_trspace) <- end(endcods_trspace)
+#load copy of the gtf in the pipeline folder
+gtf_file = here::here('pipeline/',basename(yaml::yaml.load_file('src/config.yaml')$GTF_orig)) %T>%{stopifnot(file.exists(.))}
+anno <- projmemoise(function(...){rtracklayer::import(...)})(gtf_file)
+#We want a function that 
+allcds <- anno%>%subset(type=='CDS')%>%split(.,.$protein_id)%>%sort_grl_st
+exons <- anno%>%subset(type=='exon')%>%split(.,.$transcript_id)%>%sort_grl_st 
 
-start(cds_trspace) <- start(cds_trspace) + (STARTTRIMCODS*3)
-end(cds_trspace) <- end(cds_trspace) - (ENDTRIMCODS*3)
+STARTTRIMCODS <- yaml::yaml.load_file('src/config.yaml')$STARTCODTRIM%T>%{stopifnot(!is.null(.))}
+ENDTRIMCODS <- yaml::yaml.load_file('src/config.yaml')$STOPCODTRIM %T>%{stopifnot(!is.null(.))}
+TRIMLEN = 3*(STARTTRIMCODS+ENDTRIMCODS)
+longlen = (TRIMLEN+30)
 
-trimmed_cds <- cds_trspace%>%
-  spl_mapFromTranscripts(testtrs)%>%#map back to the genome
-  split(.,.$xHits)%>%
-  unlist(use.names=TRUE)
+shortcds <- allcds[sum(width(allcds))<=longlen]
 
-mcols(trimmed_cds) <- testcds[trimmed_cds$xHits]%>%.[IntegerList(as.list(rep(1,length(.))))]%>%unlist%>%
-  {mcols(.)[,c('gene_id','transcript_id','protein_id','gene_name','transcript_name','type','phase','tag','gene_type')]}
-names(trimmed_cds)<-NULL
+cds <- allcds[sum(width(allcds)) > longlen]
 
-trimmed_cds%>%export(gtf%>%str_replace('.gtf$','.trimmed.gtf'))
+cds_trimmed <- cds%>%trim_grl((STARTTRIMCODS*3),end='fp')%>%trim_grl((ENDTRIMCODS*3),'tp')
+cds_starts <- cds%>%resize_grl((STARTTRIMCODS*3),'start')
+cds_ends <- cds%>%resize_grl((ENDTRIMCODS*3),'end')
+
+cds_trimmed%>%unlist%>%rtracklayer::export(gtf_file%>%str_replace('\\.gtf$','.trimmed.cds.gtf'))
+shortcds%>%unlist%>%rtracklayer::export(gtf_file%>%str_replace('\\.gtf$','.short.cds.gtf'))
+
+unique(mcols(anno)[,c('gene_id','transcript_id')])%>%write.table(row.names=F,here('pipeline','gid2trid.txt'))
+unique(mcols(anno)[,c('transcript_id','protein_id')])%>%write.table(row.names=F,here('pipeline','trid2prid.txt'))
+unique(mcols(anno)[,c('gene_id','protein_id')])%>%write.table(row.names=F,here('pipeline','gid2prid.txt'))
+unique(mcols(anno)[,c('gene_name','gene_id')])%>%write.table(row.names=F,here('pipeline','gnm2gid.txt'))
+here('pipeline','gnm2gid.txt')%>%fread
+
+
+
+
+
+# metaplotmats
+
+# fafile=file.path(here('pipeline',yaml::yaml.load_file('src/config.yaml')%>%.$REF_orig%>%basename%>%str_replace('.gz$','')))%T>%{stopifnot(file.exists(.))}
+
+# testatgs <- cds[bestcds]%>%head%>%resize_grl(3,'start')%>%.[elementNROWS(.)==1]%>%head%>%unlist
+
+# getSeq(FaFile(fafile),testatgs)
+
+# testatgs%>% resize(1)%>%{pmapToTranscripts (.,exonsexp[testatgs$transcript_id])}%>%
+#   # resize(3,fix='end',ignore.strand=TRUE)%>%
+#   resize(3,'start',ignore.strand=TRUE)%>%
+#   {spl_mapFromTranscripts(.,exons_grl = exonsexp[seqnames(.)])}%>%{getSeq(FaFile(fafile),.)}
+
+# metaplotwinds%>%.[elementNROWS(.)==1]%>%resize(150,'end')%>%resize(3,'start')%>%head%>%unlist%>%getSeq(FaFile(fafile),.)
+# metaplotwinds
+
+
+
