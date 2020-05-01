@@ -1,0 +1,416 @@
+---
+title: "Hierarchical Clustering of Ribo-seq Expression data"
+output: 
+ html_notebook:
+  toc: yes
+---
+  
+
+# Clustering
+
+We'll cluster the data using cosine distances (generally better for gene expression data - bases clustering on the general direction of the change, and removes between gene differences in the magnitude of change).
+
+```{r heatmapfuncsetup}
+rld = normcounts
+data=assay(rld)
+rowscale=T
+distfunc=NULL
+nmax = 1e3
+#define the contrasts we want to plot
+clustercontrasts <- c(TE_LEPvPRE = "LEP vs PRE",TE_ZPvLEP =  "Time dependent change in TE - ZYGPACH vs LEP",
+TE_MIIvZP = "Time dependent change in TE - MII vs ZYGPACH")
+clustercontrasts <- c(clustercontrasts,TE = "Average TE")
+stopifnot(clustercontrasts %in% names(resultslist))
+coefficients <- resultslist[clustercontrasts]%>%map(as.data.frame)%>%map_df(.id='contrast',select,'log2FoldChange','lfcSE','padj','gene_id')
+coefficients%<>%mutate(coefficient = names(clustercontrasts)[match(contrast,clustercontrasts)])
+
+cordist <- function(X){
+  
+  require(matrixStats)
+  
+  X = X - (rowMeans(X))
+  
+  D = X %*% t(X)
+  
+  mags = sqrt(diag(D))
+  
+  Dc = t(t ( D / mags  ) / mags )
+  
+  as.dist(1 - Dc)
+  
+}
+clustering_heatmap <- function(data,coefficients,cluster_with='data',clustermethod='hclust',kmax = 12,rowscale=T,distfunc=cordist,nmax=Inf,clustercols=NULL,dosighm=F){
+  # exportenv()
+  # stop()
+  # 
+  stopifnot(c('coefficient','log2FoldChange','lfcSE','padj','gene_id')%in% colnames(coefficients))
+  
+  #filter our data
+  require(ComplexHeatmap)
+  require(fastcluster)
+  
+  data_scaled = data
+  if(rowscale) data_scale = t(scale(t(data)))
+
+  data_scaled = data_scaled[rowSds(data_scaled)>1e-5,]
+
+  
+  n_removed = nrow(data) - nrow(data_scaled)
+
+  message(str_interp('removed ${n_removed} genes because the scaled expression has no variance'))
+  
+  message(str_interp('removing ${max(nrow(data_scaled)-nmax,0)} of the least variable genes'))
+
+  data_scaled = data_scaled[order(rowSds(data_scaled)),]%>%tail(nmax)
+  
+  coefficients <- coefficients %>%filter(gene_id %in% rownames(data_scaled))
+  
+  
+  #make matrices of the coefs and their significance
+  coefmat <- coefficients%>%select(gene_id,coefficient,log2FoldChange)%>%spread(coefficient,log2FoldChange)%>%
+    {set_rownames(as.matrix(.[,-1]),.[,1])}
+  coefmat <- coefmat[rownames(data_scaled),]
+  coefficients %<>% mutate(issig = padj < 0.05)
+  
+  sigmat <- coefficients%>%select(gene_id,coefficient,issig)%>%spread(coefficient,issig)%>%
+    {set_rownames(as.matrix(.[,-1]),.[,1])}
+  
+  
+  #Then, firstly cluster the data columns
+    #column dendrogram
+  col.dd <- hclust(distfunc(t(data_scaled)), method="complete")%>%as.dendrogram
+  #order for columns
+  col_dd_reordered = seq_along(colnames(data_scaled))
+  col_dd_reordered <- reorder(col.dd, wts = col_dd_reordered, agglo.FUN = mean)
+
+  
+  #now cluster the rows
+  if(cluster_with=='data'){
+    clustdata = data_scaled
+  } else if(cluster_with == 'coefficients'){
+    clustdata = coefmat
+  }
+  if(!is.null(clustercols)){
+    assert_that(all(clustercols %in% colnames(clustdata)))
+    clustdata <- clustdata[,clustercols]
+  }
+
+  #row dendrogram
+  if(is.null(clustermethod)){
+    row.dd = F
+    row_annotation =NULL
+  }else if(is.vector(clustermethod) & !is.null(names(clustermethod))){
+    stopifnot(all(rownames(data)%in%names(clustermethod)))
+    rnames = rownames(data_scaled)
+    data_scaled %<>% .[order(clustermethod[rnames]),]
+    coefmat %<>% .[order(clustermethod[rnames]),]
+    row.dd = F
+    #row_annotation = rowAnnotation( width = 0.2,df=as.data.frame(list(clustermethod[rnames])),show_legend=F,border=TRUE,na_col='black')
+    row_annotation=NULL
+    row_order=order(clustermethod[rnames])
+  } else  if(clustermethod=='hclust'){
+    
+    row.hc <- fastcluster::hclust(distfunc(clustdata),method='complete')
+    row.dd <- row.hc %>% as.dendrogram
+    rowordering = labels(row.dd)%>%match(rownames(clustdata))
+      
+    # 
+    # cutree(row.hc,8)%>%table%>%sort
+    # cutree(row.hc,13)%>%table%>%sort
+    {
+    cutreelistorig = (2:kmax)%>%setNames(.,paste0('k_',.))%>%lapply(function(k)letters[cutree(row.hc,k=k)])
+    cutreelist=cutreelistorig
+    #RECODE the bottom level to alphabetic ordering
+    unsort2sort_clustname <- cutreelistorig[[kmax-1]][rowordering]%>%unique%>%setNames(sort(.),.)
+    cutreelist[[kmax-1]] %<>% unsort2sort_clustname[.]%>%setNames(NULL)
+    #First of all, recode the hierarchical clusterings to give consistent colorings between layers of the plot
+    #so  a,b,c,d -> a,b,d -> a,d etc.
+    for(ind in kmax:3){
+      nextvals <- split(
+        cutreelist[[ind-1]],
+        cutreelist[[ind-2]]
+      )%>%map_chr(1)
+      cutreelist[[ind-2]] %<>% recode_factor(!!!nextvals)%>%as.character
+    }
+    #createa  list of colors for the annotation bars
+    #collist = list(setNames(rainbow(kmax),letters[1:(kmax)]) )%>%rep(kmax-1)%>%setNames(names(cutreelist))
+    collist = list(setNames(rep('white',kmax),letters[1:(kmax)]) )%>%rep(kmax-1)%>%setNames(names(cutreelist))
+    #
+    #Now color in the new cluster in each of the sequence with balck
+    newval=cutreelist[[1]]%>%unique%>%head(1)
+    for(i in seq(1,length(collist),1)){
+      if(i!=1) newval = cutreelist[[i]]%>%setdiff(cutreelist[[i-1]])%>%unique
+      collist[[i]][]='white'
+      collist[[i]][newval]='black'
+      # names(cutreelist)[i]=newval
+      # names(collist)[i]=newval
+  
+      #also color the borders of each cluster, so we can see where they are
+      borderinds <- data.frame(cat = cutreelist[[i]],ind =rowordering)%>%
+      group_by(cat)%>%slice(c(1,n()))%>%.$ind
+  
+      grpvect = cutreelist[[i]][rowordering]
+      cutreelist[[i]][rowordering[cumsum(head(Rle(grpvect)@lengths,-1))]]=NA
+    }
+    
+
+    #cutreelist[[7]][head(row_order(hm),200)] = NA
+    #cutreelist%>%length
+    cutreelist <- c(cutreelist,cutreelist[kmax-1])
+    collist <- c(collist,collist[kmax-1])
+    collist[[kmax]]<-rep('black',kmax) 
+    collist[[kmax]][seq(2,kmax,2)] <- 'white' 
+    names(collist)[kmax] <- 'all'
+    names(cutreelist)[kmax] <- 'all'
+    names(collist[[kmax]])<-names(collist[[kmax-1]])
+    cutreelist[[kmax]][rowordering]
+    row_annotation = rowAnnotation( width = 0.2,df=as.data.frame(cutreelist),show_legend=F,col = collist,border=TRUE,na_col='black')
+    
+    row_order=NULL
+    }
+  } else{
+    stop('clustermethod not supported')
+  }
+
+  #resultslist
+  ht_opt$simple_anno_size=unit('4','mm')
+
+  
+  datahm <- Heatmap(name='Gene Expression',
+        data_scaled,
+        row_order=NULL,
+        cluster_rows = row.dd,
+        cluster_columns = col.dd,
+        show_row_names = F,
+        left_annotation = row_annotation,
+        row_dend_width = unit(4,'cm'),
+        na_col = 'black'
+  )
+
+
+  
+  coefhm =  Heatmap(
+    name = 'Model Coefficients',
+    coefmat[rownames(data_scaled),],
+    row_order = row_order(datahm),
+    show_row_names = F
+  )
+  
+  if(dosighm){
+    sighm <- Heatmap(name='Coefficient significance',
+    matrix=  sigmat[rownames(data_scaled),],
+    row_order = row_order(datahm),
+    show_row_names = F,
+    cluster_columns = F,
+    col = c(`FALSE`='white',`TRUE`='purple'),
+    na_col='white'
+    )
+  }else{
+    sighm = NULL
+  }
+  datahm + coefhm + sighm
+  
+}
+#read in our go clustering fucntions
+base::source(here('src/gofuncs.R'))
+
+#GTOGO <- readRDS(here('data/GTOGO.rds'))
+GTOGO <- select(GTOGO,gene_name,go_id,gene_id)%>%filter(gene_id %in% rownames(rld))%>%group_by(go_id)%>%filter(n()>10)
+
+
+get_clust_go_tables <- function(clustermap,GTOGO,myontologys = c('BP','MF','CC')%>%setNames(.,.)){
+  
+  stopifnot(!is(clustermap,'hashmap'))
+  
+  
+  clustervals <- clustermap%>%unique
+  clustgores<-
+    map_df(.id='ontology',myontologys,function(myontology){
+      map_df(.id='cluster',clustervals%>%setNames(.,.),function(clusterval_i){
+        require('topGO')
+        # clustermap%>%{(possibly(rungo,NULL)(.,GTOGO,myontology))}
+        setNames(clustermap %in% clusterval_i,names(clustermap))%>%{suppressMessages(possibly(rungo,NULL)(.,GTOGO,myontology))}
+      })
+    })
+}
+
+#and memoise
+get_clust_go_tables <- projmemoise(get_clust_go_tables)
+
+
+go_comparison_plot <- function(oclustgores,clusteringname,ontname,ngenes=10)  {
+  #go_comparison_plot <-
+    oclustgores%>%group_by(cluster)%>%    filter(elimFisher<0.05)%>%
+    slice(1:ngenes)%>%
+    select(Term,elimFisher)%>%
+    arrange(cluster,elimFisher)%>%
+    ungroup%>%
+    mutate(Term = as_factor(Term))%>%
+    mutate(cluster = as_factor(cluster))%>%
+  	ggplot(.,aes(x=cluster,color=-log10(elimFisher),
+  	             # size=-log10(elimFisher),
+  	                y=Term),
+  	     
+  	       )+
+  	geom_point()+
+  	theme_bw()+
+    ggtitle(str_interp('Shared GO Term Plot - ${clusteringname}\n ${ontname}'))
+}
+#memoise
+go_comparison_plot <- projmemoise(go_comparison_plot)
+
+```
+
+We'll use the GO terms provided to assess functional overlap between clusters
+
+### Cluster Data, visualize
+
+We'll cluster the first 12k most variable genes, this should be more than enough, since only `r length(changegenes)` change in any way between data sets. Note that these will then appear as NA/None in some of the plots below - this class will inevitably end up enriched for some functional classes - specifically, those which are not expressed.
+
+```{r}
+datahm <- clustering_heatmap(
+  data = assay(rld),
+  coefficients = coefficients,
+  cluster_with = 'data',
+  nmax = 12e3
+)
+```
+
+
+```{r}
+datahm
+```
+Hierarchical clustering involves constructing a distance matrix, and then assembling the genes into a tree, which clusters the most similiar. This tree can be cut any height to give an arbitrary number of clusters. The above plot shows the results of hierarchical clustering on the normalized count data. Here, we split the tree down to a depth of 12 clusters.
+
+On the left, we see the overall tree, and beside it are bars showing, at each subdivision, the new cluster created. The final bar 'all' shows all the clusters (with every second one colored black)
+
+
+### Cluster Data, GO analysis of clusters
+
+To assess the functional enrichment of our clusters, and overlap in function, we then plot the top10 GO terms enriched in each one.
+
+```{r,results='hide'}
+hm=datahm;allgids=rownames(rld)
+get_clust_map<-function(hm,allgids) {
+  lastclustname <- hm@ht_list[["Gene Expression"]]@left_annotation%>%names%>%tail(1)
+  vals <- hm@ht_list[["Gene Expression"]]@left_annotation@anno_list[[lastclustname]]@fun@var_env$value
+  vals[row_order(datahm)] %<>% {.[is.na(.)]=lag(.)[is.na(.)];.}
+  outmap = vals%>%
+      setNames(hm@ht_list[["Gene Expression"]]@matrix%>%rownames)%>%
+    {safe_hashmap(keys=names(.),values=.)}
+  noclustgids <- allgids%>%setdiff(outmap$keys())
+  outmap[[noclustgids]] = rep('None',length(noclustgids))
+  
+  outmap%>%{setNames(.$values(),.$keys())}
+}
+
+hmmap <- get_clust_map(datahm,rownames(rld))
+
+
+#now collate and arrange them
+clustgores <- get_clust_go_tables(hmmap,GTOGO)
+
+myontologys = c('BP','MF','CC')%>%setNames(.,.)
+
+
+```
+
+First, we'll plot the top10 terms enriched in each cluster:
+```{r fig.height=10,dev='svg'}
+goplotsdatahm<-map(myontologys,function(ont) go_comparison_plot(
+      clustgores%>%filter(ontology==ont)%>%filter(elimFisher<0.05),
+      clusteringname = 'hierarchical clustering - ',
+      ontname = ont,
+      ngenes=10
+))
+invisible(lapply(goplotsdatahm, print))
+
+```
+
+The table below shows the data plotted above - we can filter for specific clusters, go terms (using the text boxes under the columns) and order by specific columns (by clicking on the arrows).
+
+
+```{r}
+library(DT)
+datatable(clustgores%>%select(ontology,cluster,GO.ID,elimFisher,Term,Enrichment,Annotated,Significant,Expected),filter=c('top'))
+```
+
+
+
+
+###  Coefficient Clusters
+
+As well as plotting the raw data, we can cluster using the the coefficients from our model - here we do so using the following coefficients:
+
+
+```{r coefhm}
+coefhm <- clustering_heatmap(
+  data = assay(rld),
+  coefficients = coefficients,
+  cluster_with = 'coefficients',
+  clustercols = head(names(clustercontrasts),3),
+  clustermethod = 'hclust',
+  nmax = 12e3
+)
+
+coefhm
+```
+
+###  Coefficient Clusters GO Analysis
+
+```{r}
+
+cohmmap <- get_clust_map(coefhm,rownames(rld))
+
+ 
+#now collate and arrange them
+coclustgores <- get_clust_go_tables(cohmmap,GTOGO)
+myontologys = c('BP','MF','CC')%>%setNames(.,.)
+
+```
+
+Let's also plot the different GO terms for the coefficient based clusters:
+
+```{r fig.height=10,dev='svg'}
+goplotscoefhm<-map(myontologys,function(ont) go_comparison_plot(
+      coclustgores%>%filter(ontology==ont)%>%filter(elimFisher<0.05),
+      clusteringname = 'hierarchical clustering - ',
+      ontname = ont,
+      length(changegenes)
+))
+invisible(lapply(goplotscoefhm, print))
+```
+
+The table below shows the data plotted above - we can filter for specific clusters, go terms (using the text boxes under the columns) and order by specific columns (by clicking on the arrows).
+
+
+```{r}
+library(DT)
+datatable(coclustgores%>%select(ontology,cluster,GO.ID,elimFisher,Term,Enrichment,Annotated,Significant,Expected),filter=c('top'))
+```
+
+# Output Tables
+
+Below you can see the files into which various objects from the above analysis have been saved.
+
+```{r, echo=TRUE,include=TRUE}
+dir.create(here('tables'),showWarnings = F)
+
+#annotations of genes by cluster
+if(is(hmmap,'Rcpp_Hashmap')){
+  hmmap%>%{setNames(.$values(),.$keys())}%>%enframe('gene','cluster')%>%write_tsv(here('tables/dataclusters.tsv'))
+  }else{hmmap%>%enframe('gene','cluster')%>%write_tsv(here('tables/dataclusters.tsv'))}
+cohmmap%>%enframe('gene','cluster')%>%write_tsv(here('tables/coefclusters.tsv'))
+
+#Go term analysis for our data based clusters
+clustgores%>%filter(elimFisher<0.05)%>%write_tsv(here('tables/dataclusters_go_results.tsv'))
+
+#GO term analysis for our coefficient based clusters
+coclustgores%>%filter(elimFisher<0.05)%>%write_tsv(here('tables/coef_clusters_go_results.tsv'))
+
+
+
+```
+
+
+

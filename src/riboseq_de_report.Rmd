@@ -1,25 +1,23 @@
 ---
-title: "Meoisis Ribo-seq Clustering"
+title: "Ribo-seq Differential Expression Report"
 output: 
  html_notebook:
   toc: yes
 ---
   
-# Clustering - Zea Mays Meoisis Riboseq data
+# Clustering - 
   
 # Setup
   
-```{r loadinglibraries, include=FALSE, echo=FALSE, eval=T}
+```{r loadinglibraries, include=TRUE, echo=FALSE, eval=T}
+library(knitr)
+#various default chunk options for the report
 knitr::opts_chunk$set(root.dir = here::here(),eval=TRUE,cache=FALSE,echo=FALSE,warning = FALSE,message = FALSE,include=TRUE,
                       fig.width =7,fig.height=7,out.width=700,out.height=700,dev='svg')
 
-library(rmarkdown)
-library(knitr)
+# Eelco  - This is library is worth understanding. Rstudio has an annoying feature where when you execute code inline (in this window) the home diretory is the location of the file, but if you do it in the terminal, it's the project root.
+#This leads to all sorts of nasty bugs, so you should wrap file paths in the function 'here', which makes sure they are relative tot he project root (it automatically detects where taht is based things like your .Rproj file, and your git folder)
 library(here)
-library(magrittr)
-library(stringr)
-library(ggplot2)
-library(dbscan)
 
 dir.create(here('data'),showWarnings=F)
 dir.create(here('R_cache'),showWarnings=F)
@@ -28,19 +26,21 @@ base::source(here('src/Rprofile.R'))
 
 ```
 
-
+#parameter setttings
 ```{r}
-l2fc_threshold <- 0.32
+l2fc_threshold <- 0.32#i.e. a 1.25 fold change, at least
 ```
 
 ```{r dds, include=FALSE, echo=FALSE, eval=T}
 
 
 #this perl creates a file with unique gene_id, gene_name in pairs, faster than loading the whole gtf if it's big
-# perl -lane '/gene_name\W+(\w+)\W/ ;my $a=$1;/gene_id\W+(\w+)\W/; print($a,"\t",$1)' <(cat  pipeline/genes.chrnm.gtf) | uniq | sort | uniq > pipeline/gid_2_gname.txt
+gnmfile <- here('pipeline','gid_2_gname.txt')
+stopifnot(file.exists(gnmfile))
 # gtf <- here('pipeline/genes.chrnm.gtf')
 # anno <- projmemoise(function(gtf){rtracklayer::import(gtf)})(gtf)
-gid2gname <- fread(here('data/gid_2_gname.txt'))%>%set_colnames(c('gene_name','gene_id'))
+
+if(!exists('gid2gname'))gid2gname <- fread(gnmfile)%>%set_colnames(c('gene_name','gene_id'))
 
 #read in the sample_parameter file from the piepline
 sampdf <- fread(here('src/sample_parameter.csv'))%>%
@@ -50,6 +50,7 @@ sampdf <- fread(here('src/sample_parameter.csv'))%>%
 
 sampdf <- sampdf%>%mutate_if(is_character,as_factor)
 sampdf$assay%<>%fct_relevel(c('total','ribo'))
+
 stopifnot(!any(is.na(sampdf$assay)))
 #
 if(is.null(sampdf$sample_name)) sampdf$sample_name <- sampdf$sample_id
@@ -107,6 +108,7 @@ if(!file.exists(here('data/dds.rds'))){
 }
 cat('successfully loaded  countdata and annotation')
 stopifnot(exists('sampdf'))
+
 ```
 
 
@@ -124,8 +126,13 @@ if(!file.exists(here('data/normcounts.rds'))){
   normcounts<-readRDS(here('data/normcounts.rds'))
 }
 cat('successfully normalized  countdata')
+
 ```
 
+
+## Contrast testing
+
+The linear model describing our data 
 
 ```{r test contrasts}
 stopifnot(exists('dds'))
@@ -133,25 +140,30 @@ stopifnot(exists('normcounts'))
 stopifnot(exists('sampdf'))
 {
   #do a trial run of DESeq to get the contrast names
+  #for marco p design <- as.formula('~ assay * temp * as_factor(time)')
   design <- as.formula('~ assay * fraction')
   design(dds) = design
   testdds = DESeq(head(dds,2*ncol(dds)))
   resnames = resultsNames(testdds)
   resnames
 }
-#in this case we got
-#[1]"Intercept"               "assay_ribo_vs_total"     "mstage_LEP_vs_PRE"       "mstage_ZYGPACH_vs_PRE"
-#[5] "mstage_MII_vs_PRE"       "assayribo.mstageLEP"     "assayribo.mstageZYGPACH" "assayribo.mstageMII"
-#for resnames, so our contrasts can be....
-resnames = resultsNames(testdds)
 
+resnames = resultsNames(testdds)
+message(paste0(resnames,sep='\n'))
+```
+
+
+```{r test contrasts}
+#if we e.g. got [1] "Intercept"            "assay_ribo_vs_total"  "fraction_si_vs_mock"  "assayribo.fractionsi"
+
+#based on the results of the above, you want to compose this list of vectors
 contrasts <- list(
   "assay_ribo_vs_total" = c(0,1,0,0),
   "fraction_si_vs_mock" = c(0,0,1,0),
   "assayribo.fractionsi" = c(0,0,0,1)
 )
 
-#check the contrasts
+#Now make sure they work
 for(contrastname in names(contrasts)){
   contrast = contrasts[[contrastname]]
   if(is.character(contrast) & length(contrast)==1){
@@ -165,6 +177,7 @@ for(contrastname in names(contrasts)){
 }
 
 cat('tested contrasts')
+
 ```
 
 
@@ -172,42 +185,67 @@ cat('tested contrasts')
 #you might want to use vst if there's a lot of data, for speed
 dir.create(here('data'))
 if(!file.exists(here('data/resultslist.rds'))){
+  
+  #Now run DESeq WITHOUT fold change shrinkage - doesn't work with interactions
+  #Can be included if transcriptional change is of particular interest.
 	design(dds) <- design
- 
   dds <- DESeq(dds,betaPrior = F)
+  
   #and get the contrasts we need
   resultslist <- lapply(contrasts,results,object = dds)
   names(resultslist) <- names(contrasts)
   for(i in seq_along(resultslist))resultslist[[i]]$gene_id = rowData(dds)$gene_id
   
-  ddstodf<- function(ddsdf)results(ddsLRT)%>%as.data.frame%>%rownames_to_column('gene_id')
+  #get a list of genes that appear to undergo any change at all.(exluding between riboseq and mRNAseq)  
+  ddstodf<- function(ddsdf){results(ddsLRT)%>%as.data.frame%>%rownames_to_column('gene_id')}
   ddsLRT = DESeq(dds, test="LRT", full=~assay*fraction,reduced = ~ assay)
   changegenes <- results(ddsLRT)%>%ddstodf %>%subset%>%filter(padj < 0.05)%>%.$gene_id
   
   saveRDS(changegenes,here('data/changegenes.rds'))
   
+  
   if(do_xtail){
-    run_xtail = function()Sys.glob(here('pipeline','xtail/*'))%>%setNames(.,basename(.)%>%str_extract(regex('(?<=xtail_).*(?=\\.tsv)')))
-#    xtailcontrasts = 'fraction'
- #   xtailfiles = run_xtail(dds)  
-    xtailfiles <- run_xtail()
-    xtailres = map_df(.id='contrast',xtailfiles,fread)
+    
+    run_xtail = function(){
+      Sys.glob(here('pipeline','xtail/*'))%>%setNames(.,basename(.)%>%str_extract(regex('(?<=xtail_).*(?=\\.tsv)')))
+    }
+    terms <- model.frame(dds@design,data=colData(dds))%>%colnames
+    stopifnot('assay' %in% terms)
+    conditionvar = terms%>%setdiff('assay')
+    sampdf%<>%arrange(assay,!!conditionvar)
+    rnasamples <-sampdf%>%filter(assay=='ribo')%>%.$sample_id
+    ribosamples <-sampdf%>%filter(assay!='ribo') %>%.$sample_id
+
+    sampdf <- sampdf%>%ungroup%>%.[order(.$assay,.[[conditionvar]]),]
+    conditionvect <-  sampdf%>%safe_filter(sample_id %in% rnasamples)%>%.[[conditionvar]]
+    conditionvect_ribo <-  sampdf%>%safe_filter(sample_id %in% ribosamples)%>%.[[conditionvar]]
+    stopifnot(conditionvect == conditionvect_ribo)
+    conditions=unique(conditionvect)
+    stopifnot(length(conditions)==2)
+    
+    mrnatab <- counts(dds)%>%as.data.frame%>%.[,rnasamples]%>%set_rownames(rownames(dds))
+    ribotab <- counts(dds)%>%as.data.frame%>%.[,ribosamples]%>%set_rownames(rownames(dds))
+    
+    xtailres <- xtail::xtail(mrnatab,ribotab,conditionvect,threads=20)
+    conditions<-unique(conditionvect)
+    xtailtable <- xtailres$resultsTable%>%rownames_to_column%>%set_colnames(
+      c("feature_id","mRNA_log2FC", "RPF_log2FC", "log2FC_TE_v1", "pvalue_v1", paste0(conditions[1],"_log2TE"), 
+      paste0(conditions[2],"_log2TE"), "log2FC_TE_v2", "pvalue_v2", "log2FoldChange", 
+      "pvalue", "padj")
+    )
+    
     xtailres$isxtail = TRUE
     xtailres$contrast = paste0('xtailTE_',xtailres$contrast)
     
     ddsreslist<-resultslist[!str_detect(names(resultslist),'xtail')]
     # xtailres%<>%rename(log2FoldChange := log2fc)
-    xtailres%<>%rename(gene_id := feature_id)
-    xtailres %<>% rename(baseMean := base_mean)
+    xtailres%<>%mutate(gene_id= feature_id)
+    xtailres %<>% safe_left_join(resultslist[[1]]%>%as.data.frame%>%select(feature_id,baseMean),by='feature_id')
     resultslist <- c(ddsreslist,split(xtailres,xtailres$contrast))  
   }
 
   
-  resultslist = 
-  
   saveRDS(resultslist,here('data/resultslist.rds'))
-  
-  
   
 }else{
   resultslist<-readRDS(here('data/resultslist.rds'))
@@ -217,21 +255,20 @@ if(!file.exists(here('data/resultslist.rds'))){
 cat('successfully calculated contrasts:')
 message(names(resultslist)%>%paste(collapse=' '))
 
-
 ```
-
 
 # QC {.tabset}
 
-```{r qc, include = TRUE,message=TRUE,eval=T,cache=T,results='asis'}
+```{r qctest, include = TRUE,message=TRUE,eval=T,cache=T,results='asis',include=T}
 stopifnot(exists('dds'))
 stopifnot(exists('normcounts'))
 stopifnot(exists('sampdf'))
 
-cat("## ----dispplot------------------------------------------------------------")
-#plotDispEsts(dds)
+cat("## dispplot")
+plotDispEsts(dds)
 rld <- normcounts
-cat("## ----outlierplot---------------------------------------------------------")
+
+cat("## outlierplot")
 if(is.null(SummarizedExperiment::assays(dds)[["cooks"]])){
   nulltext = "Cooks distance is meaningless\n because we only have one group per sample"
   qplot(label=nulltext,x=1,geom='text',y=1,size=I(14))+theme_bw()
@@ -239,7 +276,10 @@ if(is.null(SummarizedExperiment::assays(dds)[["cooks"]])){
   boxplot(log10(SummarizedExperiment::assays(dds)[["cooks"]]), range=0, las=2)
 }
 
-cat("## ----countdist ,warning=F------------------------------------------------")
+
+
+cat("## countdist ")
+
 my_counts <-
   DESeq2::counts(dds)%>%
   as.data.frame() %>%
@@ -248,6 +288,7 @@ my_counts <-
 
 sample_annot <- as.data.frame(SummarizedExperiment::colData(dds))
 if(!'sample_name' %in% colnames(sample_annot)) sample_annot$sample_name<-sample_annot$sample_id
+sample_annot$sample_id%<>%as.character
 my_counts <-
   dplyr::left_join(my_counts, sample_annot, by = "sample_id")
 
@@ -264,19 +305,16 @@ my_counts %>%
   scale_y_log10() +
   coord_flip()
 
-
-
-cat("## ----rlddf---------------------------------------------------------------")
 stopifnot(is(rld,'DESeqTransform'))
 
 rld_df <- assay(rld)
 
 rld_df <-
   assay(rld) %>%
-  as.data.frame() %>%
-  tibble::rownames_to_column('feature_id') %>%
-  tibble::as_data_frame() %>%
-  tidyr::gather(sample_id, reg_log_count, -feature_id)
+    as.data.frame() %>%
+    tibble::rownames_to_column('feature_id') %>%
+    tibble::as_data_frame() %>%
+    tidyr::gather(sample_id, reg_log_count, -feature_id)
 
 rld_df$sample_name <- sample_annot$sample_name[match(rld_df$sample_id,colData(dds)$sample_id)]
 # rld_df <- get_reg_log_counts(dds, blind = T)
@@ -285,15 +323,17 @@ rld_dispersion <-
   rld_df  %>%
   dplyr::group_by(feature_id) %>%
   dplyr::summarise(mean_reg_log_count = mean(reg_log_count),
-                   sd_reg_log_count = sd(reg_log_count))
+            sd_reg_log_count = sd(reg_log_count))
+
+cat("## dispersionplot ")
 
 rld_dispersion %>%
-  ggplot(aes(y = sd_reg_log_count, x = mean_reg_log_count)) +
+ggplot(aes(y = sd_reg_log_count, x = mean_reg_log_count)) +
   geom_point() +
   labs(x = "mean log regularized counts", y = "standar deviation log regularized counts")
 
 
-cat("## ----pca, cache = F, fig_width=12,fig_height=12---------------------------")
+cat("## pca ") 
 stopifnot(colnames(rld)==colnames(dds))
 
 message('calculating PCAs')
@@ -310,20 +350,26 @@ pca = pca +
 #we also want a table with these data to pick out outliers
 pca$data %>% write_tsv(here('data/pca.tsv'))
 
-cat("## ----pca_grouplabel, fig_width=12,fig_height=12---------------------------")
+## ----pca_grouplabel, fig_width=12,fig_height=8---------------------------
 (pca+geom_text(aes(label=group),size=I(2),alpha=I(0.5)))%>%{.$layers=.$layers[-1];.+geom_point(size=I(0))}+ggtitle('PCA : labelled by group')
 
-cat("## ----pca_nolabel, fig_width=12,fig_height=12------------------------------")
+## ----pca_nolabel, fig_width=12,fig_height=8------------------------------
 (pca+geom_text(aes(label=group),size=I(0),alpha=I(0.5)))%>%{.$layers=.$layers[-1];.+geom_point(size=I(3))}+ggtitle('PCA')
 
 
-cat("## ----heatmap-------------------------------------------------------------")
+
+cat("## heatmap")
+
 # dual scale settings for heatmaps
 ## setting values outside of the range [z_min, z_max] to the limiting values
 if(!exists('z_max')) z_max <-  3.5
 if(!exists('z_min')) z_min <- -3.5
 # colnames(rld_df) %<>% {stringr::str_replace(.,'sample_id','sample_name')}
 plot_heatmap_fluc_features(500, rld_df, z_min = z_min, z_max = z_max)
+
+
+cat("## Gene read count table heatmap")
+
 
 my_counts%<>%group_by(sample_name)%>%
   mutate(countclass = case_when(
@@ -338,14 +384,11 @@ my_counts%<>%group_by(sample_name)%>%
 
 my_counts$countclass%<>%factor(levels=c('> 1000','> 100','> 32','> 8','< 8',' 0 '))
 stopifnot(!any(is.na(my_counts$countclass)))
-
-
 my_counts%>%
-  group_by(sample_name,countclass)%>%tally%>%spread(countclass,n)%>%.[rev(colnames(.))]%>%select(sample_name,everything())%>%kable(label='gene count classes')
+    group_by(sample_name,countclass)%>%tally%>%spread(countclass,n)%>%.[rev(colnames(.))]%>%select(sample_name,everything())%>%print
 
+cat("This table gives an impression of how many genes have been quantified at what level. 32 is a reasonable cutoff to detect strong changes, 100 is a reasonable cutoff to detect smallish ones.")
 ```
-
-qc plots above
 
 
 
@@ -353,13 +396,15 @@ qc plots above
 # Differential expression
 
 ```{r}
- trim_gids <- function(df){
+
+trim_gids <- function(df){
     df=as.data.frame(df);
     df%>%mutate_at(vars(matches('gene_id|feature_id')),list(~str_replace(.,'\\.\\d+','')))
   }
 contrast = names(resultslist)[[4]]
 regdirfuncs = list(Up=identity,Down=function(x)x * -1)
 regdir='Up'
+
 for(contrast in names(resultslist)){
   for(regdir in names(regdirfuncs)){
     regdirfunc = regdirfuncs[[regdir]]
@@ -390,154 +435,109 @@ for(contrast in names(resultslist)){
         )
   }
 }
-res = resultslist[[contrast]]
-res%>%filter(log10(baseMean)>4.5)
-  
-
-resultslist[[2]]%>%as.data.frame%>%filter(gene_id==tgene)%>%select(log2FoldChange)
-
-tgene = 'ENSMUSG00000029580.14'
-colData(dds)
-resultslist[[3]]%>%as.data.frame%>%filter(gene_id==tgene)%>%select(log2FoldChange)
-resultslist[[4]]%>%filter(gene_id==tgene)%>%select(contrast,log2FoldChange)
-
-resultslist[[3]]%>%as.data.frame%>%filter(gene_id==tgene)
-
-assay(normcounts)[tgene,] %>% enframe('sample_id','log_reg_count')%>%
-    arrange(sample_id)%>%
-    left_join(sampdf)%>%qplot(data=.,x=group,y=log_reg_count,geom='point')
-
-t2gene = resultslist$assay_ribo_vs_total%>%as.data.frame%>%arrange(desc(log2FoldChange))%>%.$gene_id%>%head(1)
-
-assay(normcounts)[t2gene,] %>% enframe('sample_id','log_reg_count')%>%
-    arrange(sample_id)%>%
-    left_join(sampdf)%>%qplot(data=.,x=group,y=log_reg_count,geom='point')
-
-
-t2gene = resultslist$fraction_si_vs_mock%>%as.data.frame%>%arrange(desc(log2FoldChange))%>%.$gene_id%>%head(4)%>%tail(1)
-
-assay(normcounts)[t2gene,] %>% enframe('sample_id','log_reg_count')%>%
-    arrange(sample_id)%>%
-    left_join(sampdf)%>%qplot(data=.,x=group,y=log_reg_count,geom='point')
-
-```
-
-```{r}
-
-```
-
-
-
-```{r}
-ebp1_ip_df <- bind_rows(.id='DSP',list(
-  DSP = fread(here('ext_data/1mM_DSP.csv')),
-  noDSP = fread(here('ext_data/no_DSP.csv'))
-))
-
-left_join(
-  resultslist$fraction_si_vs_mock%>%as.data.frame%>%
-    select(gene_id,transcriptional_change = log2FoldChange),
-  resultslist$xtailTE_fraction%>%
-    select(gene_id,TE_change = log2FoldChange),
-  by='gene_id'
-)%>%qplot(data=.,x=transcriptional_change,y=TE_change,geom='point')
-
-ggpubr::ggarrange(
-resultslist$xtailTE_fraction%>%qplot(data=.,x=mRNA_log2FC,y=RPF_log2FC,geom='point')+coord_cartesian(xlim=c(-4,4),ylim=c(-4,4))+theme_bw()+scale_x_continuous('Transcriptional change')+scale_y_continuous('RPF change')+geom_smooth(method='lm'),
-
-resultslist$xtailTE_fraction%>%qplot(data=.,x=mRNA_log2FC,y=log2FoldChange,geom='point')+theme_bw()+scale_x_continuous('Transcriptional change')+scale_y_continuous('TE change (xtail)')
-)
-
-
-
-
 ```
 
 
 ```{r}
-library(biomaRt)
-mart<-useMart('ENSEMBL_MART_ENSEMBL')
-mart<-useDataset('mmusculus_gene_ensembl',mart)
-ens_ref_gids<-biomaRt::getBM(attributes = c( "ensembl_gene_id","refseq_mrna"), 
-               filters='ensembl_gene_id', 
-               values = cds$gene_id%>%unique,
-               mart = mart)
-ens_ref_gids%>%as.data.frame%>%write_tsv(here('pipeline/ensembl2reseq.tsv'))
+#get highcount genes
+highcountgenes<-counts(dds)%>%as.data.frame%>%rownames_to_column('gene_id')%>%gather(lib,count,-gene_id)%>%
+    mutate(lib = str_replace(lib,'_\\d$',''))%>%
+  {stopifnot(tally(.)%>%.$n%>%table%>%length%>%`==`(1));.}%>%
+  group_by(gene_id,lib)%>%
+    summarise(count=sum(count))%>%
+    filter(count>32)%>%
+  .$gene_id
 
-resultslist$xtailTE_fraction%>%{lm(.$RPF_log2FC ~ .$mRNA_log2FC)}%>%confint()
+changecols<-c('#1db220','#737373','#fef636','#b31261')%>%setNames(c("TE only", "mRNA only", "compensating", "concurrent"))
 
-kocontrastname = names(resultslist)[4]
-IP_KO_mergeres<-ebp1_ip_df%>%select(gene_name=Gene_name,everything())%>%
-    full_join(resultslist[[kocontrastname]]%>%trim_gids%>%left_join(gid2gname%>%select(gene_id,gene_name),by='gene_id'),by='gene_name')
+#data set for fold changes
+fcsetdf = resultslist$xtailTE_fraction%>%select(TEpadj =padj, TEFC = log2FoldChange,gene_id)%>%
+    left_join(resultslist$fraction_si_vs_mock%>%as.data.frame%>%
+                select(TRpadj =padj, TRFC = log2FoldChange,gene_id))%>%
+    filter(gene_id %in% highcountgenes)%>%
+    mutate(
+      TEchange = (sign(TEFC))*as.numeric(TEpadj<0.05),
+      TRchange = (sign(TRFC))*as.numeric(TRpadj<0.05),
+      set = case_when(
+       ((TEchange * TRchange) == -1)  ~ 'compensating',
+      (TEchange * TRchange) == 1  ~ 'concurrent' ,
+        (abs(TRchange)) == 1 ~ "mRNA only",
+        (abs(TEchange)) == 1 ~ "TE only",
+      TRUE ~ as.character(NA)
+      )
+    )
 
-qplot(data=IP_KO_mergeres%>%filter(!is.na(DSP),padj<0.05),x=log2FoldChange,log2(RPKM_ratio),alpha=I(0.2),size=I(0.2))+
-  facet_grid(DSP~.)+
-  scale_x_continuous(name=paste0('KO Fold Change: ',kocontrastname)%>%str_replace('TE_fraction','TEchange'))+
-  theme_bw()
-
-kocontrastname = names(resultslist)[2]
-IP_KO_mergeres<-ebp1_ip_df%>%select(gene_name=Gene_name,everything())%>%
-    full_join(resultslist[[kocontrastname]]%>%trim_gids%>%left_join(gid2gname%>%select(gene_id,gene_name),by='gene_id'),by='gene_name')
-
-qplot(data=IP_KO_mergeres%>%filter(!is.na(DSP),padj<0.05),x=log2FoldChange,log2(RPKM_ratio),alpha=I(0.2),size=I(0.2))+
-  facet_grid(DSP~.)+
-  scale_x_continuous(name=paste0('KO Fold Change: ',kocontrastname)%>%str_replace('TE_fraction','TEchange'))+
-  theme_bw()
-
-
-qplot(data=IP_KO_mergeres,log2(RPKM_CDS_total),log2(baseMean))+theme_bw()+ggtitle('Signal mean comparison IP vs KO experiments')
-qplot(log2(IP_KO_mergeres$RPKM_CDS_total),log2(IP_KO_mergeres$baseMean))
-cor.test(IP_KO_mergeres$log2FoldChange,log2(IP_KO_mergeres$RPKM_ratio))
-
-
-IP_KO_mergeres%>%filter(DSP=='DSP')%>%left_join(IP_KO_mergeres%>%filter(DSP=='noDSP')%>%select(gene_name,noDSP_ratio = RPKM_ratio))%>%transmute(gene_name,log2FoldChange,l2DSP_spec_RPKM_ratio=log2(RPKM_ratio) - log2(noDSP_ratio))%>%
-  qplot(data=.,x=log2FoldChange,l2DSP_spec_RPKM_ratio,alpha=I(0.2),size=I(0.2))+
-    scale_x_continuous(name=paste0('KO Fold Change: ',kocontrastname)%>%str_replace('TE_fraction','TEchange'))+
-    theme_bw()
+#print fc plot
+dir.create(here('tables'),showWarnings = F)
+fcsetdf%>%left_join(gid2gname%>%select(gene_id,gene_name))%>%write_tsv(here('tables/fcsetdf.tsv')%T>%normalizePath%T>%message)
+p = fcsetdf %>%
+  filter(!is.na(set))%>%
+  qplot(data=.,x=TRFC,y=TEFC,geom='point',color=set)+
+  theme_bw()+
+  scale_color_manual('Set',values = changecols)+
+  scale_x_continuous('Transcriptional change',limits=c(-3,3))+
+  scale_y_continuous('TE change (xtail)',limits=c(-3,3))+
+  coord_fixed()
+plotfile <- 'plots/xtail_fc.pdf'
+dir.create(dirname(plotfile))
+pdf(plotfile)
+print(p)
+dev.off()
+message(normalizePath(plotfile))
 
 ```
+
+
+## Contrasts Enrichment
 
 ```{r}
 base::source(here('src/gofuncs.R'))
 
-GTOGO <- select(GTOGO,gene_name,go_id,gene_id)%>%filter(gene_id %in% rownames(rld))%>%group_by(go_id)%>%filter(n()>10)
-GTOGO$gene_id%<>%str_replace('\\.\\d+$','')
+GTOGO <- select(GTOGO,gene_name,go_id,gene_id)%>%filter(gene_id %in% rownames(normcounts))%>%group_by(go_id)%>%filter(n()>10)
 
-txnupregres <- rungo(resultslist$fraction_si_vs_mock%>%trim_gids%>%{setNames((.$log2FoldChange>0) & (.$padj<0.05),.$gene_id)},GTOGO,'CC')
-te_upregres <- rungo(
-  resultslist$xtailTE_fraction%>%trim_gids%>%{setNames((.$log2FoldChange>0) & (.$padj<0.05),.$gene_id)},GTOGO,'CC')
+regdirfuncs = list(Up=identity,Down=function(x)x * -1)
 
-gotables<-lapply(list(Transcriptional=resultslist$fraction_si_vs_mock,TE=resultslist$xtailTE_fraction),function(fc_df){
-  lapply(regdirfuncs,function(regdirfunc){
-    lapply(c('BP','MF','CC'),function(ont){
-      rungo(fc_df%>%trim_gids%>%{setNames((regdirfunc(.$log2FoldChange)>0) & (.$padj<0.05),.$gene_id)},GTOGO,ont)
+contrgotables<-map_df(.id='contrast',resultslist,function(fc_df){
+  map_df(.id='regdir',regdirfuncs,function(regdirfunc){
+    map_df(.id='ontology',c('BP','MF','CC')%>%setNames(.,.),function(ont){
+      possibly(rungo,otherwise = NULL,quiet=TRUE)(fc_df%>%{setNames((regdirfunc(.$log2FoldChange)>0) & (.$padj<0.05),.$gene_id)},GTOGO,ont)
     })
   })
 })
-
-plot_go_enrich(gotables[['Transcriptional']][['Up']][[2]],'elimFisher',paste0('Transcriptional ','Up','CC'))
-plot_go_enrich(teres,'elimFisher',paste0('Transcriptional ','Up','CC'))
-
 ```
 
 
 ```{r}
-#BiocManager::install(c('wmtsa'))
-source('https://raw.githubusercontent.com/lulab/Ribowave/1e0d61963d2d41d4e0df3faefa2c09bfe84e2278/scripts/function.R')
-my_DWPT(c(19,4,2))
-
-
+for(contr in unique(contrgotables$contrast)){
+  for(regdir in unique(contrgotables$regdir)){
+    for(ont in unique(contrgotables$ontology)){
+        plot_go_enrich(contrgotables%>%filter(contrast==contr,regdir==regd,ontology=ont),'elimFisher',paste(contrast,regdir,ontology))
+    }
+  }
+}
 ```
-Let's check and see about this mitochondrial normalisation.
+
 
 ```{r}
-mitognames <- read_tsv('../ext_data/mitognames.tsv',col_names=F)
+library(DT)
+datatable(contrgotables%>%select(ontology,contrast,regdir,GO.ID,elimFisher,Term,Enrichment,Annotated,Significant,Expected),filter=c('top'))
+```
 
-resultslist[[4]]%>%trim_gids%>%left_join(gid2gname)%>%filter(gene_name%in%mitognames[[1]])
+# Output Tables
 
-mitognames[[1]]%in%gid2gname$gene_name
+Below you can see the files into which various objects from the above analysis have been saved.
 
+```{r, echo=TRUE,include=TRUE}
+dir.create(here('tables'),showWarnings = F)
 
-
+#raw count data
+counts(dds)%>%as.data.frame%>%rownames_to_column('gene_id')%>%write_tsv(here('tables/rawcountdata.tsv'))
+assay(normcounts)%>%as.data.frame%>%rownames_to_column('gene_id')%>%write_tsv(here('tables/rawcountdata.tsv'))
+#all coefficient, fold changes
+resultslist%>%map_df(.id='contrast',as.data.frame)%>%write_tsv(here('tables/allcontrasts.tsv'))
+#mapping from GO terms to genes
+GTOGO%>%write_tsv(here('tables/go_gene_map.tsv'))
+#
+contrgotables%>%write_tsv(here('tables/contrast_goenrich.tsv'))
 ```
 

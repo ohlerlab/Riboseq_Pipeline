@@ -74,20 +74,3 @@ trim_grl <- function(grl,bp,end='tp'){
   }
 }
 
-
-#metaplots
-
-
-
-
-# 
-# resize_grl(grl,sum(width(grl))+1,fix='end')
-# 
-# cdsgrl<-cds%>%split(.,.$protein_id)
-# cdsgrl%>%width%>%sum%>%min
-# cdsgrl <- cdsgrl%>%sort
-# 
-# out<-resize_grl(cdsgrl,3)
-# 
-# 
-# cdsgrl[1]%>%trim_grl(-2)
