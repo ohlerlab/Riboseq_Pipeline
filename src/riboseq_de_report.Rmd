@@ -1,10 +1,10 @@
 ---
-title: "Ribo-seq Differential Expression Report"
+title: "Ribo-seq Differential Expression Report Marco"
 output: 
  html_notebook:
   toc: yes
 ---
-  
+#.libPaths('/max-fast/MarcoP_analysis/envs/R/')  
 # Clustering - 
   
 # Setup
@@ -28,7 +28,7 @@ base::source(here('src/Rprofile.R'))
 
 #parameter setttings
 ```{r}
-l2fc_threshold <- 0.32#i.e. a 1.25 fold change, at least
+l2fc_threshold <- 0.32 #i.e. a 1.25 fold change, at least
 ```
 
 ```{r dds, include=FALSE, echo=FALSE, eval=T}
@@ -42,7 +42,7 @@ stopifnot(file.exists(gnmfile))
 
 if(!exists('gid2gname'))gid2gname <- fread(gnmfile)%>%set_colnames(c('gene_name','gene_id'))
 
-#read in the sample_parameter file from the piepline
+#read in the sample_parameter file from the pipeline
 sampdf <- fread(here('src/sample_parameter.csv'))%>%
   select(-(library_layout:fragment_length_sd))%>%
   as.data.frame%>%set_rownames(.,.$sample_id)
@@ -78,7 +78,7 @@ if(!file.exists(here('data/dds.rds'))){
     seqnames=str_extract('Chr','^[^;]+'),
     start = str_extract(Start,'^[^;]+')%>%as.numeric,
     end = str_extract(End,'[^;]+$')%>%as.numeric,
-    strand = str_extract(Strand,'^[^;]+'),
+    strand = str_extract(Strand,'^[^;]+')
   )
   #coerce from df to GRanges
   genegr = GRanges(genegr)

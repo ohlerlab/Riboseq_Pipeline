@@ -3,7 +3,7 @@
     {
         "m_mem_free": "4g",
         "h_rt": "4:00:00",
-        "pe": "smp 4",
+        "pe": "smp 2",
         "os": "centos7",
         "name"      : "JOBNAME.{rule}.{wildcards}",
         "output"    : "logs/cluster/{rule}.{wildcards}.out",
@@ -80,17 +80,17 @@
     },
     "star_index":
     {
-        "m_mem_free": "32G",
+        "m_mem_free": "20G",
         "os": "centos6",
         "h_rt": "12:00:00",
-        "pe": "smp 8"
+        "pe": "smp 6"
     },
     "star":
     {
-        "m_mem_free": "32G",
+        "m_mem_free": "20G",
         "os": "centos6",
         "h_rt": "12:00:00",
-        "pe": "smp 8"
+        "pe": "smp 6"
     },
     
     "gsnap":

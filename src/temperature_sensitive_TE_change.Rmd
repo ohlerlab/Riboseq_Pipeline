@@ -1,0 +1,248 @@
+---
+title: "Temperature_sensitve_TE_change"
+author: "Eelco Meerdink"
+output:
+  pdf_document: default
+  html_document:
+    df_print: paged
+---
+
+```{r loadinglibraries, include=TRUE, echo=FALSE, eval=T}
+#prepare envoriment and loading data prepared before.
+library(knitr)
+#various default chunk options for the report
+knitr::opts_chunk$set(root.dir = here::here(),eval=TRUE,cache=FALSE,echo=FALSE,warning = FALSE,message = FALSE,include=TRUE,
+                      fig.width =7,fig.height=7,out.width=700,out.height=700,dev='svg')
+
+library(here)
+dir.create(here('R_cache'),showWarnings=F)
+base::source(here('./Rprofile.R'))
+#parameter setttings
+l2fc_threshold <- 0.32 #i.e. a 1.25 fold change, at least
+
+sampdf <- fread(here('./sample_parameter2.csv'))%>%
+  select(-(library_layout:fragment_length_sd))%>%
+  as.data.frame%>%set_rownames(.,.$sample_id)
+
+sampdf <- sampdf%>%mutate_if(is_character,as_factor)
+sampdf$assay%<>%fct_relevel(c('total','ribo'))
+sampdf$fraction%<>%fct_relevel(c('39C','37C','35C','33C'))
+sampdf$group%<>%fct_relevel(c('150min','12h'))
+
+stopifnot(!any(is.na(sampdf$assay)))
+if(is.null(sampdf$sample_name)) sampdf$sample_name <- sampdf$sample_id
+
+dds <-readRDS(here('./data/dds.rds'))
+normcounts<-readRDS(here('./data/normcounts.rds'))
+
+```
+
+```{r load design/contrasts and create resultslist, include=TRUE, echo=FALSE, eval=T}
+design <- as.formula('~ assay * group * as_factor(fraction)')
+design(dds) <- design
+dds <- DESeq(dds,betaPrior = F)
+resultsNames(dds)
+
+contrasts <- list(
+  "TE_150min_39C" =                     c(0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0),
+  "RNA_150minvs12h_39C" =               c(0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0),
+  "RNA_150min_37VS39" =                 c(0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0),
+  "RNA_150min_35VS39" =                 c(0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0),
+  "RNA_150min_33VS39" =                 c(0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0),
+  "TE_150minVS12h_39C" =                c(0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0),
+  "TE_150min_37CVS39C" =                c(0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0),
+  "TE_150min_35CVS39C" =                c(0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0), 
+  "TE_150min_33CVS39C" =                c(0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0),
+  "RNA_150minVS12h_37CVS39C" =          c(0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0),
+  "RNA_150minVS12h_35CVS39C" =          c(0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0),
+  "RNA_150minVS12h_33CVS39C" =          c(0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0),  
+  "TE_150minVS12h_37CVS39C" =           c(0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0),
+  "TE_150minVS12h_35CVS39C" =           c(0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0),
+  "TE_150minVS12h_33CVS39C" =           c(0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1),
+  "TE_12h_39C" =                        c(0,1,0,0,0,0,1,0,0,0,0,0,0,0,0,0),
+  "TE_150min_37C" =                     c(0,1,0,0,0,0,0,1,0,0,0,0,0,0,0,0),
+  "TE_150min_35C" =                     c(0,1,0,0,0,0,0,0,1,0,0,0,0,0,0,0),
+  "TE_150min_33C" =                     c(0,1,0,0,0,0,0,0,0,1,0,0,0,0,0,0),
+  "TE_12h_37C" =                        c(0,1,0,0,0,0,1,1,0,0,0,0,0,1,0,0),
+  "TE_12h_35C" =                        c(0,1,0,0,0,0,1,0,1,0,0,0,0,0,1,0),
+  "TE_12h_33C" =                        c(0,1,0,0,0,0,1,0,0,1,0,0,0,0,0,1),
+  "TE_150min_37CVS35C" =                c(0,0,0,0,0,0,0,1,-1,0,0,0,0,0,0,0),
+  "TE_150min_37CVS33C" =                c(0,0,0,0,0,0,0,1,0,-1,0,0,0,0,0,0),
+  "TE_12h_37CVS39C" =                   c(0,0,0,0,0,0,0,1,0,0,0,0,0,1,0,0),
+  "TE_12h_37CVS35C" =                   c(0,0,0,0,0,0,0,1,-1,0,0,0,0,1,-1,0),
+  "TE_12h_37CVS33C" =                   c(0,0,0,0,0,0,0,1,0,-1,0,0,0,1,0,-1),
+  "RNA_12h_37Cvs39C" =                  c(0,0,0,1,0,0,0,0,0,0,1,0,0,0,0,0),
+  "RNA_12h_37Cvs35C" =                  c(0,0,0,1,-1,0,0,0,0,0,1,-1,0,0,0,0),
+  "RNA_12h_37Cvs33C" =                  c(0,0,0,1,0,-1,0,0,0,0,1,0,-1,0,0,0),
+  "RNA_150minVS12h_37CVS35C" =          c(0,0,0,0,0,0,0,0,0,0,-1,1,0,0,0,0),
+  "RNA_150minVS12h_37CVS33C" =          c(0,0,0,0,0,0,0,0,0,0,-1,0,1,0,0,0),
+  "RNA_150min_37VS35" =                 c(0,0,0,1,-1,0,0,0,0,0,0,0,0,0,0,0),
+  "RNA_150min_37VS33" =                 c(0,0,0,1,0,-1,0,0,0,0,0,0,0,0,0,0),
+  "RIBO_150min_37Cvs39C" =              c(0,0,0,1,0,0,0,1,0,0,0,0,0,0,0,0),
+  "RIBO_12h_37Cvs39C" =                 c(0,0,0,1,0,0,0,1,0,0,1,0,0,1,0,0),
+  "RIBO_150minvs12h_37Cvs39C" =         c(0,0,0,0,0,0,0,0,0,0,-1,0,0,-1,0,0)
+  
+)
+
+resultslist <- lapply(contrasts,results,object = dds)
+names(resultslist) <- names(contrasts)
+for(i in seq_along(resultslist))resultslist[[i]]$gene_id = rowData(dds)$gene_id
+```
+
+```{r change in TE 37C vs all other groups, include=TRUE, echo=FALSE, eval=T}
+#get highcount genes
+highcountgenes<-counts(dds)%>%as.data.frame%>%rownames_to_column('gene_id')%>%gather(lib,count,-gene_id)%>%
+    mutate(lib = str_replace(lib,'_\\d$',''))%>%
+  {stopifnot(tally(.)%>%.$n%>%table%>%length%>%`==`(1));.}%>%
+  group_by(gene_id,lib)%>%
+    summarise(count=sum(count))%>%
+    filter(count>20)%>%
+  .$gene_id
+
+
+scatter_contrasts_TE = function(contr1,contr2,contr3) {
+  change <- dim(resultslist[[contr3]]%>%subset(.,log2FoldChange >= 1.5 & padj <= 0.05))[1]
+  resultslist[[contr1]]%>%as.data.frame%>%dplyr::select(contr1_padj =padj, contr1_FC = log2FoldChange, gene_id=gene_id)%>%
+  left_join(resultslist[[contr2]]%>%as.data.frame%>%
+              dplyr::select(contr2_padj =padj, contr2_FC = log2FoldChange, gene_id=gene_id))%>%
+  left_join(resultslist[[contr3]]%>%as.data.frame%>%
+              dplyr::select(contr3_padj =padj, contr3_FC = log2FoldChange, gene_id=gene_id))%>%
+  filter(gene_id %in% highcountgenes)%>%
+  ggplot(data=.,aes(x=contr1_FC,y=contr2_FC,color=((contr3_FC >= 1.5 | contr3_FC <= -1.5) & contr3_padj <= 0.05)))+ 
+  geom_point(alpha =0.5, na.rm = T) +
+  xlab(paste(contr1,"_log2"))+
+  ylab(paste(contr2,"_log2"))+
+  theme_bw() +   
+  ggtitle(contr3)+
+  labs(color = "Log2fold > 1.5 \n Padj < 0.05")+
+  annotate("text", label = c("# changed genes: \n \n",change), x = 0, y = -25, size = 3)
+}
+TE_37vs33_150min=scatter_contrasts_TE("TE_150min_37C","TE_150min_33C","TE_150min_37CVS33C")
+TE_37vs35_150min=scatter_contrasts_TE("TE_150min_37C","TE_150min_35C","TE_150min_37CVS35C")
+TE_37vs39_150min=scatter_contrasts_TE("TE_150min_37C","TE_150min_39C","TE_150min_37CVS39C")
+TE_37vs33_12h=scatter_contrasts_TE("TE_12h_37C","TE_12h_33C","TE_12h_37CVS33C")
+TE_37vs35_12h=scatter_contrasts_TE("TE_12h_37C","TE_12h_35C","TE_12h_37CVS35C")
+TE_37vs39_12h=scatter_contrasts_TE("TE_12h_37C","TE_12h_39C","TE_12h_37CVS39C")
+
+
+ggarrange(TE_37vs33_150min,TE_37vs35_150min,TE_37vs39_150min, TE_37vs33_12h, TE_37vs35_12h, TE_37vs39_12h, 
+          labels = c("A", "B", "C","D","E","F"), legend = 'right', common.legend = T,
+          ncol = 3, nrow = 2)
+
+
+```
+
+```{r Different representitations of PCA, include = TRUE,message=TRUE,eval=T,cache=T,results='asis',include=T}
+
+rld <- normcounts
+rv <- rowVars(assay(rld))
+# select the ntop genes by variance
+select <- order(rv, decreasing=TRUE)[seq_len(min(500, length(rv)))]
+# perform a PCA on the data in assay(x) for the selected genes
+pca_dev <- prcomp(t(assay(rld)[select,]))
+percentVar = pca_dev$sdev^2 / sum( pca_dev$sdev^2)
+percentVar_mat <- data.frame(PC = colnames(pca_dev$x) ,percentage = matrix(pca_dev$sdev^2 / sum( pca_dev$sdev^2)))
+barplot(height = percentVar_mat$percentage[1:40], names = percentVar_mat$PC[1:40],ylab = "% Variance",main = "% Variance explained by PC")
+pca = plotPCA_allPC(rld,intgroup=c("fraction",'assay','group'))
+pca_data = pca$data
+trans_PCA = pca_data%>%pivot_longer(cols = c(colnames(pca_data)[1:40]),names_to = 'PC', values_to = 'values')
+trans_PCA$PC%<>%factor(levels=c(colnames(pca_data)[1:40]))
+
+pca2 = plotPCA_allPC(rld,intgroup=c('assay', "group"))
+
+pca2 = pca2 +
+  expand_limits(x = pca$data$PC1 %>%
+                  range %>%
+                  multiply_by(1.5)) +
+  expand_limits(y = pca$data$PC2 %>%
+                  range %>%
+                  multiply_by(1.3))
+
+## ----pca_nolabel, fig_width=12,fig_height=8------------------------------
+(pca2+geom_text(aes(label=group),size=I(0),alpha=I(0.5)))%>%{.$layers=.$layers[-1];.+geom_point(size=I(3))}+ggtitle('PC1 and 2')+theme(axis.text.x = element_text(angle = 90, hjust = 1),plot.title = element_text(hjust = 0.5))
+
+trans_PCA1 = pca_data%>%pivot_longer(cols = c(colnames(pca_data)[3:20]),names_to = 'PC', values_to = 'values')
+trans_PCA1$PC%<>%factor(levels=c(colnames(pca_data)[3:20]))
+ggplot(trans_PCA1, aes(x=PC, y=values,color=fraction, shape = group.1)) + 
+  geom_jitter(width = 0.25) +
+  ylab("% Variance")+
+  xlab("")+
+  ggtitle("Variance for PC3-20")+
+  theme(axis.text.x = element_text(angle = 90, hjust = 1),plot.title = element_text(hjust = 0.5))
+  
+
+
+trans_PCA %>%
+  filter(PC %in% c("PC1", "PC2", "PC3"), 
+         fraction %in% c("37C","39C")) %>%
+  ggplot(aes(x=fraction, y=values,
+             color=assay, shape = group.1, 
+             size = 2)) + 
+  facet_grid(~PC, scale = "free_y") +
+  theme_bw() +
+  geom_jitter(width = 0.25) +
+  ggtitle("PC1-3 37Cvs39C")+
+  theme(axis.text.x = element_text(angle = 90, hjust = 1),plot.title = element_text(hjust = 0.5)) +
+  labs(shape = "Time", color = "Assay")
+
+trans_PCA %>%
+  filter(PC %in% c("PC3","PC4","PC5","PC6"), 
+         fraction %in% c("37C","39C")) %>%
+  ggplot(aes(x=fraction, y=values,
+             color=assay, shape = group.1, 
+             size = 2)) + 
+  facet_grid(~PC, scale = "free_y") +
+  theme_bw() +
+  geom_jitter(width = 0.25) +
+  ggtitle("PC3-6 37Cvs39C")+
+  theme(axis.text.x = element_text(angle = 90, hjust = 1),plot.title = element_text(hjust = 0.5))
+
+
+```
+
+
+```{r random other things, include = TRUE,message=TRUE,eval=T,cache=T,results='asis',include=T}
+
+changecols<-c('#1db220','#0000FF','#fef636','#b31261')%>%setNames(c("y-axis sign", "x-axis sign", "both", "NA"))
+scatter_contrasts = function(contr1,contr2,contr3){
+  resultslist[[contr1]]%>%as.data.frame%>%dplyr::select(contr1_padj =padj, contr1_FC = log2FoldChange, gene_id=gene_id)%>%
+  left_join(resultslist[[contr2]]%>%as.data.frame%>%
+              dplyr::select(contr2_padj =padj, contr2_FC = log2FoldChange, gene_id=gene_id))%>%
+  left_join(resultslist[[contr3]]%>%as.data.frame%>%
+              dplyr::select(contr3_padj =padj, contr3_FC = log2FoldChange, gene_id=gene_id))%>%
+  mutate(
+      contr1change = (sign(contr1_FC))*as.numeric(contr1_padj<0.05),
+      contr2change = (sign(contr2_FC))*as.numeric(contr2_padj<0.05),
+      set = case_when(
+        ((contr1change * contr2change) == 1)  ~ 'both',
+        (abs(contr2change)) == 1 ~ "y-axis sign",
+        (abs(contr1change)) == 1 ~ "x-axis sign",
+        TRUE ~ 'NA'
+      )
+    )%>%
+  filter(gene_id %in% highcountgenes)%>%
+  #ggplot(data=.,aes(x=cont1_FC,y=contr2_FC,color=((contr3_FC >= 1.5 | contr3_FC <= -1.5) & contr3_padj <= 0.05)))+ 
+  ggplot(data=.,aes(x=contr1_FC,y=contr2_FC,color=set))+ 
+  geom_point(alpha =0.5, na.rm = T) +
+  xlab(contr1)+
+  ylab(contr2)+
+  coord_fixed(clip = 'off')+
+  theme_bw() +   
+  scale_color_manual('Set',values = changecols)+
+  ggtitle(contr3)+
+  labs(color = "Log2fold > 1.5 \n Padj < 0.05")
+  
+}
+scatter_contrasts('RNA_150min_37VS39','RNA_12h_37Cvs39C','RNA_150minVS12h_37CVS39C')
+scatter_contrasts('RIBO_150min_37Cvs39C','RIBO_12h_37Cvs39C','RIBO_150minvs12h_37Cvs39C')
+scatter_contrasts('RNA_150min_37VS39','RIBO_150min_37Cvs39C',"TE_150min_37CVS39C")
+scatter_contrasts('RNA_12h_37Cvs39C','RIBO_12h_37Cvs39C',"TE_12h_37CVS39C")
+scatter_contrasts('TE_150min_37CVS39C','RNA_150min_37VS39',"TE_150min_37CVS39C")
+
+
+scatter_contrasts('RNA_150min_37VS35','RNA_12h_37Cvs35C','RNA_150minVS12h_37CVS35C')
+scatter_contrasts('RNA_150min_37VS33','RNA_12h_37Cvs33C','RNA_150minVS12h_37CVS33C')
+scatter_contrasts('RIBO_150min_37Cvs39C','RIBO_12h_37Cvs39C','RIBO_150minvs12h_37Cvs39C')
+
+
+```

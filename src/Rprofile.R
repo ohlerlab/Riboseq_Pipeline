@@ -17,9 +17,11 @@ suppressMessages(library(testthat))
 suppressMessages(library(memoise))
 suppressMessages(library(checkmate))
 suppressMessages(library(GenomicRanges))
-suppressMessages(library(hashmap))
+suppressMessages(library(hashmap)) ##has to be installed like this devtools::install_github("nathan-russell/hashmap")
 suppressMessages(library(zeallot))
 suppressMessages(library(ggpubr))
+suppressMessages(library(gplots))
+suppressMessages(library(xtail)) ## devtools::install_github('xryanglab/xtail')
 # 
 # library(zeallot)
 # # library(splines)
@@ -43,6 +45,8 @@ safe_hashmap<-setRefClass("Safe_Rcpp_Hashmap",
       contains="Rcpp_Hashmap",
       inheritPackage=TRUE
 )
+
+
 setMethod('[[','Safe_Rcpp_Hashmap',function (x, i, j, default,...){
   hashmapname = ''
     .local <- function (x, i, j, ..., exact = TRUE)
@@ -425,7 +429,7 @@ plot_heatmap <- function(mat, title = "", z_min = -Inf, z_max = Inf, dist_fun = 
     assert_that(is.function(dist_fun))
   }
   
-  gplots::heatmap.2(dual_scaled_mat[,10:1],
+  gplots::heatmap.2(dual_scaled_mat[,],
                     trace = 'none',
                     scale = 'none',
                     distfun  = cor_dist,
@@ -475,6 +479,41 @@ plot_heatmap_fluc_features <- function(num, rld_df, ...){
   
   plot_heatmap(rld_mat, paste0('top ', num, ' fluctuating features'), ...)
 
+}
+
+### try to flirt with the DESeq2 functions
+plotPCA_allPC = function(object, intgroup="condition", ntop=500, returnData=FALSE,XPC='PC1',YPC = 'PC2')
+{
+  # calculate the variance for each gene
+  rv <- rowVars(assay(object))
+  # select the ntop genes by variance
+  select <- order(rv, decreasing=TRUE)[seq_len(min(500, length(rv)))]
+  # perform a PCA on the data in assay(x) for the selected genes
+  pca <- prcomp(t(assay(object)[select,]))
+  # the contribution to the total variance for each component
+  percentVar <- pca$sdev^2 / sum( pca$sdev^2 )
+  if (!all(intgroup %in% names(colData(object)))) {
+    stop("the argument 'intgroup' should specify columns of colData(dds)")
+  }
+  intgroup.df <- as.data.frame(colData(object)[, intgroup, drop=FALSE])
+  # add the intgroup factors together to create a new grouping factor
+  group <- if (length(intgroup) > 1) {
+    factor(apply( intgroup.df, 1, paste, collapse=":"))
+  } else {
+    colData(object)[[intgroup]]
+  }
+  
+  # assembly the data for the plot
+  d <- data.frame(pca$x, group=group, intgroup.df, name=colnames(object))
+  if (returnData) {
+    attr(d, "percentVar") <- percentVar[1:2]
+    return(d)
+  }
+  
+  ggplot(data=d, aes_string(x=XPC, y=YPC, color="group")) + geom_point(size=3) + 
+    xlab(paste0(XPC,': ',round(percentVar[as.integer(str_sub(XPC,-1))] * 100),"% variance")) +
+    ylab(paste0(YPC,': ',round(percentVar[as.integer(str_sub(YPC,-1))] * 100),"% variance")) +
+    coord_fixed()
 }
 # 
 # grl = GRangesList(list(c(

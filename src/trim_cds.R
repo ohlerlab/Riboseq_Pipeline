@@ -1,6 +1,5 @@
 #load the gtf
-library(GenomicFeatures)
-# source('src/Rprofile.R')
+source('../src/Rprofile.R')
 fmcols <- function(grl,...){
   with(grl@unlistData@elementMetadata,...)[start(grl@partitioning)]
 }
@@ -9,14 +8,16 @@ fmcols_List <- function(grl,...){
 }
 
 #load copy of the gtf in the pipeline folder
-gtf_file = here::here('pipeline/',basename(yaml::yaml.load_file('src/config.yaml')$GTF_orig)) %T>%{stopifnot(file.exists(.))}
+#gtf_file = here::here('pipeline',basename(yaml::yaml.load_file('../src/config.yaml')$GTF_orig))%>%{stopifnot(file.exists(.))}
+gtf_file = here::here('pipeline',basename(yaml::yaml.load_file('../src/config.yaml')$GTF_orig))
+
 anno <- projmemoise(function(...){rtracklayer::import(...)})(gtf_file)
 #We want a function that 
 allcds <- anno%>%subset(type=='CDS')%>%split(.,.$protein_id)%>%sort_grl_st
 exons <- anno%>%subset(type=='exon')%>%split(.,.$transcript_id)%>%sort_grl_st 
 
-STARTTRIMCODS <- yaml::yaml.load_file('src/config.yaml')$STARTCODTRIM%T>%{stopifnot(!is.null(.))}
-ENDTRIMCODS <- yaml::yaml.load_file('src/config.yaml')$STOPCODTRIM %T>%{stopifnot(!is.null(.))}
+STARTTRIMCODS <- yaml::yaml.load_file('../src/config.yaml')$STARTCODTRIM%T>%{stopifnot(!is.null(.))}
+ENDTRIMCODS <- yaml::yaml.load_file('../src/config.yaml')$STOPCODTRIM%T>%{stopifnot(!is.null(.))}
 TRIMLEN = 3*(STARTTRIMCODS+ENDTRIMCODS)
 longlen = (TRIMLEN+30)
 
