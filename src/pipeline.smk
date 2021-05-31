@@ -270,6 +270,9 @@ rule trim_reads:
 #
 
 
+
+
+
 ##########################################################
 ######### trna/rRNA filtering with bowtie
 ##########################################################
@@ -1239,3 +1242,101 @@ rule rseq:
   Rscript src/build_project.R
 
   """
+
+
+
+
+################################################################################
+########Quantification
+################################################################################
+  
+
+
+rule make_salmon_index:
+  threads: 8
+  input: PCFASTA
+  output: salmonindex = touch('salmonindex/.done')
+  conda: '../envs/salmon'
+  shell:r""" salmon index -p {threads}  -k 21 -t {input} -i salmonindex"""
+
+rule salmon:
+  input:fastqs=get_sample_fastqs,salmonindex='salmonindex/.done'
+  params:
+    # salmonindex = lambda wc,input: 'salmonindexribo' if wc['sample'] in ribosamples else input.salmonindex.replace('.done',''),
+    salmonindex = 'salmonindex',
+    lib = lambda wc,input: 'SF' if wc['sample'] in ribosamples else 'SR'
+  output:
+      done = touch('salmon/data/{sample}/.done'),
+      quant = touch('salmon/data/{sample}/quant.sf')
+  threads: 4
+  conda:'../envs/salmon'
+  shell:r"""
+      set -ex
+      mkdir -p salmon/reports/{wildcards.sample}
+      mkdir -p salmon/data/{wildcards.sample}
+      salmon quant \
+      -p {threads} \
+      -l {params.lib} \
+      --seqBias \
+      -i {params.salmonindex} \
+      -r <(zcat {input.fastqs} ) \
+      --output salmon/data/{wildcards.sample} \
+      --validateMappings
+"""
+
+rule ribotrans_expr:
+  input:
+    bam = 'star/pc/data/{sample}/{sample}.bam',
+    fasta = GTF_orig.replace('.gtf','.orfext.fa')
+  threads:4
+  conda: '../envs/riboem'
+  output: efile = 'ribotrans_process/{sample}/ribotrans_expr.tr_expr.tsv'
+  params: efileroot = lambda wc,output: output.efile.replace('.tr_expr.tsv','')
+  shell: r"""
+    python ../src/transform_processbam.py -e \
+     -i {input.bam} \
+     -f {input.fasta} \
+     -o {params.efileroot}
+  """
+
+#TODO better matching of riboseq and rnaseq
+def ribo2rna(sample):
+  return sample.replace('Ribo','RNA')
+
+#installing this is a bitch
+#1) Download teh source
+#2) Make a conda environment with GCC4.9 and seqan 1.4.2 (1.4.1 isn't available on conda)
+#2) 
+#3) make riboprof INC="-I/fast/home/d/dharnet/miniconda3/envs/ribomap/seqan-library-1.4.2/include -I/fast/home/d/dharnet/miniconda3/envs/ribomap/include/"
+
+rule cdsrangefile:
+  input: PCFASTA
+  output: 'ribomap/cdsrange.txt'
+  # shell:r"""grep -e '>' {TRFASTA} | perl -lane 'if($.==1){{print join "\t","Gene name","Start index", "CDS Length"}}; /(ENSMUST\w+\.\w+).*CDS:(\d+)\-(\d+)/;print join "\t",$1,$2,$3-$2' > {output}"""
+  # shell:r"""grep -e '>' {PCFASTA} | perl -lane ';/(ENST\w+)\.\w+.*CDS:(\d+)\-(\d+)/;print join "\t",$1,$2,$3-$2' | tr -d '>'  > {output}""")
+  shell:r"""mkdir -p ribomap; grep -e '>' {PCFASTA} | perl -lane ';/ENS\w+\.\w+.*CDS:(\d+)\-(\d+)/;print join "\t",$_,$1-1,$2' | tr -d '>'  > {output}"""
+
+rule ribomap:
+  input: 
+    PCFASTA,
+    ribo_bam = 'star/pc/data/{sample}/{sample}.bam',
+    # rnabam = lambda wc: 'star/pc/data/'+ribo2rna(wc['sample'])+'/'+ribo2rna(wc['sample'])+'.bam' ,
+    rnabam = lambda wc: 'star/pc/data/{sample}/{sample}.bam'.format(sample=ribo2rna(wc['sample'])),
+    salmon = lambda wc: 'salmon/data/{sample}/quant.sf'.format(sample=ribo2rna(wc['sample'])),
+    cdsrange = 'ribomap/cdsrange.txt'
+    # offsetfile = 'offsets.txt'
+  output: 'ribomap/{sample}/{sample}.ribomap.base'
+  conda:'../envs/ribomap'
+  params:
+    outbase = lambda wc,output: output[0].replace('.base','')
+  shell: r"""
+    mkdir -p $(dirname {output[0]})
+    ../Applications/ribomap/bin/riboprof -v --fasta {PCFASTA} \
+      -o {params.outbase} \
+      --cds_range {input.cdsrange} \
+      --mrnabam {input.rnabam} \
+      --ribobam {input.ribo_bam} --min_fplen 25 --max_fplen 35 \
+      --sf {input.salmon} --tabd_cutoff 0 --useSecondary \
+      -p 4 > $(dirname {output[0]})/.out
+  """
+
