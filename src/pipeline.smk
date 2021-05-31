@@ -134,6 +134,9 @@ rule all:
     expand('feature_counts_readrange/data/{sample}/{gcol_generegion}/{readrange}/feature_counts', sample=rnasamples, gcol_generegion='gene_id__CDS', readrange=config['RIBOLENRANGE']),
     expand("ORFquant/{sample}/.done", sample = ribosamples),
     expand('riboseqc/data/{sample}/.done', sample=ribosamples)
+    expand('salmon/data/{sample}/.done',sample=rnasamples),
+    expand('ribotrans_process/{sample}/ribotrans_expr.tr_expr.tsv',sample=ribosamples),
+    expand('ribomap/{sample}/{sample}.ribomap.base',sample=ribosamples)
 
 MINREADLENGTH=config['MINREADLENGTH']
 MAXREADLENGTH=config['MAXREADLENGTH']
