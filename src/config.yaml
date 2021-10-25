@@ -1,26 +1,36 @@
 #note that file paths are relative to the pipeline directory
-root: "/fast/AG_Ohler/dharnet/Riboseq_Pipeline"
-REF_orig: "../ext_data/genome/GRCh38.primary_assembly.genome.fa"
-GTF_orig: "../ext_data/annotation/gencode.v30.primary_assembly.annotation.gtf"
+#where the project lives
+root: "/fast/AG_Ohler/dharnet/SRP_Riboseq"
+#the genome
+REF_orig: "../ext_data/GRCh38.primary_assembly.genome.fa"
+#annotation as gtf file - you can get these form the 
+GTF_orig: "../ext_data/gencode.v37.primary_assembly.annotation.gtf"
+#
+PCFASTA: "../ext_data/gencode.v37.pc_transcripts.fa"
+#a file of contaminants (tRNA, rRNA etc for your organism)
 Contam: "../ext_data/contaminants.fa"
-collapse_reads_script: "../src/pipeline_scripts/collapse_reads.pl"
+#read lengths for cut adapt to filter out - note that we'll do further filtering later in riboseqc etc
 MINREADLENGTH: 18
 MAXREADLENGTH: 100
+#quality liit for cutadapt
 QUALLIM: 20
-REMOVE8NBIN: "../remove8N.pl"
+#
 sample_files: "../src/read_files.csv"
 sample_parameter: "../src/sample_parameter.csv"
+#option to replace multiqc with ones own command (you can ignore unless you want to tweak the reports yourself)
 multiqcscript: 'multiqc'
+#this has some scripts for QC etc.
 rnaseqpipescriptdir: '../src/pipeline_scripts/'
-STARTCODTRIM: 15
-STOPCODTRIM: 5
+#this is the adapter we want to trim off of our riboseq reads with cut adapt ()
 ADAPTERSEQ: "TGGAATTCTCGGGTGCCAAGG"
-SPECIES: "HEK"
-RIBOSEQCPACKAGE: "../Applications/RiboseQC/"
-ORFquantPACKAGE: "../Applications/ORFquant/"
+#points towards installations of riboseqc and ORFquant
+RIBOSEQCPACKAGE: "../../Applications/RiboseQC/"
+ORFquantPACKAGE: "../../Applications/ORFquant/"
+#this can be used to bypass some of the riboseq steps if necessary
+#leave as filter_reads for full pipeline, cutadapt reads if you have no UMIs.
 FILT_RIBO_FOLDER: "filter_reads"
+#trim the version numbers off of gencode gene/transcript ids? (makes e.g go term analysis easier)
 TRIM_IDS: False
 no_UMIs: True
+#leave as is generally
 FILT_RNA_FOLDER: 'preprocessed_reads'
-RNALENRANGE: "20_1000"
-RIBOLENRANGE: "25_31"

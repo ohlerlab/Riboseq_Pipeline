@@ -1,10 +1,17 @@
-sample_id,library_layout,read_pattern,protocol,fragment_length_mean,fragment_length_sd,group,assay,fraction
-total_1,SINGLE, -f *fastq.gz,no,150,20,riboPOOLs_27_30nt,ribo,27_30nt
-riboPOOLs_27_30nt_2,SINGLE, -f *fastq.gz,no,150,20,riboPOOLs_27_30nt,ribo,27_30nt
-RiboZero_20nt_1_2,SINGLE, -f *fastq.gz,no,150,20,RiboZero_20nt,ribo,20nt
-RNaseH_27_30nt_1,SINGLE, -f *fastq.gz,no,150,20,RNaseH_27_30nt,ribo,27_30nt
-riboPOOLs_27_30nt_1,SINGLE, -f *fastq.gz,no,150,20,riboPOOLs_27_30nt,ribo,27_30nt
-RiboZero_27_30nt_1,SINGLE, -f *fastq.gz,no,150,20,RiboZero_27_30nt,ribo,27_30nt
-RiboZero_27_30nt_2,SINGLE, -f *fastq.gz,no,150,20,RiboZero_27_30nt,ribo,27_30nt
-RNaseH_27_30nt_2,SINGLE, -f *fastq.gz,no,150,20,RNaseH_27_30nt,ribo,27_30nt
-RiboZero_56_60nt_1_2,SINGLE, -f *fastq.gz,no,150,20,RiboZero_56_60nt,ribo,56_60nt
+sample_id,libtype,group,isriboseq
+Cyto_KO_R1,SF,Cyto_KO,True
+Cyto_KO_R2,SF,Cyto_KO,True
+Cyto_KO_R3,SF,Cyto_KO,True
+Cyto_KO_R4,SF,Cyto_KO,True
+Cyto_WT_R1,SF,Cyto_WT,True
+Cyto_WT_R2,SF,Cyto_WT,True
+Cyto_WT_R3,SF,Cyto_WT,True
+Cyto_WT_R4,SF,Cyto_WT,True
+Membrane_KO_R1,SF,Membrane_KO,True
+Membrane_KO_R2,SF,Membrane_KO,True
+Membrane_KO_R3,SF,Membrane_KO,True
+Membrane_KO_R4,SF,Membrane_KO,True
+Membrane_WT_R1,SF,Membrane_WT,True
+Membrane_WT_R2,SF,Membrane_WT,True
+Membrane_WT_R3,SF,Membrane_WT,True
+Membrane_WT_R4,SF,Membrane_WT,True

@@ -1,0 +1,424 @@
+---
+title: "QC report"
+output: 
+ html_notebook:
+  toc: yes
+---
+# Setup
+  
+```{r loadinglibraries, include=FALSE, echo=FALSE, eval=T}
+knitr::opts_chunk$set(root.dir = here::here(),eval=TRUE,cache=FALSE,echo=FALSE,warning = FALSE,message = FALSE,include=TRUE,
+                      fig.width =7,fig.height=7,out.width=700,out.height=700,dev='svg')
+
+library(rmarkdown)
+library(knitr)
+library(here)
+library(magrittr)
+library(stringr)
+library(ggplot2)
+
+dir.create(here('data'),showWarnings=F)
+dir.create(here('R_cache'),showWarnings=F)
+
+base::source(here('src/Rprofile.R'))
+
+
+#' Plot Heatmap
+#'
+#' Input matrix will be normalized (scaled and centered) by row. Then, values
+#' smaller than z_min are set to z_min, likewise values larger than z_max are
+#' set to z_max.
+#'
+#' @param mat a matrix of numbers
+#' @param z_min all values in scaled matrix smaller than z_min are set to z_min
+#' @param z_max all values in scaled matrix larger than z_max are set to z_max
+#' @param dist_fun a distance function used for hierarchical clustering
+#' @param title string, the title of the heatmap
+#'
+#' @return a list (see ?gplots::heatmap.2 for details)
+#' @export
+plot_heatmap <- function(mat, title = "", z_min = -Inf, z_max = Inf, dist_fun = NULL){
+  assert_that(is.matrix(mat))
+  assert_that(is.numeric(mat))
+  scaled_mat <- t(scale(t(mat)))
+  
+  dual_scaled_mat <- pmin(pmax(scaled_mat, z_min), z_max)
+  # pmin returns the minima of two vectors by position; the shorter vector gets recycled
+  # pmax returns the maxima of two vectors by position; the shorter vector gets recycled
+  if (is.null(dist_fun)) {
+    cor_dist <- function(mat) {
+      my_dist <- as.dist(1 - cor(t(mat), use = 'pairwise.complete.obs'))
+      return(my_dist)
+    }
+    dist_fun <- cor_dist
+  }else{
+    assert_that(is.function(dist_fun))
+  }
+  
+  gplots::heatmap.2(dual_scaled_mat[,],
+                    trace = 'none',
+                    scale = 'none',
+                    distfun  = cor_dist,
+                    margins = c(8,4),
+                    srtCol = 45,
+                    labRow = F,
+                    na.color = 'grey',
+                    main = title,
+                    col = rev(colorRampPalette(RColorBrewer::brewer.pal(10, "RdBu"))(128) ))
+}
+
+
+#' Plot Heatmap of Top Fluctuating Genes
+#'
+#' Takes a data frame with regularized log transformed counts, sorts genes by
+#' decreasing standard deviation and includes the top number of fluctuating
+#' features in a heatmap.
+#'
+#' @param num integer, number of top fluctuating features to be included in
+#'   heatmap
+#' @param rld_df a data frame with variables feature_id, sample_name,
+#'   reg_log_count
+#' @param ... parameters are passed to plot_heatmap
+#'
+#' @return a list (see ?gplots::heatmap.2 for details)
+#' @export
+plot_heatmap_fluc_features <- function(num, rld_df, ...){
+  assert_that(is.count(num))
+  assert_that(is.data.frame(rld_df))
+  assert_that(all(has_name(rld_df, c("feature_id", "sample_name", "reg_log_count"))))
+  
+  rld_disp_wide <-
+    rld_df %>%
+    dplyr::select(feature_id, sample_name, reg_log_count) %>%
+    dplyr::group_by(feature_id) %>%
+    dplyr::mutate(sd_reg_log_count = sd(reg_log_count)) %>%
+    dplyr::ungroup() %>%
+    tidyr::spread(sample_name, reg_log_count) %>%
+    dplyr::arrange(desc(sd_reg_log_count))
+  
+  rld_mat <-
+    rld_disp_wide %>%
+    dplyr::slice(1:num) %>%
+    dplyr::select(-sd_reg_log_count) %>%
+    as.data.frame(stringsAsFactors = F) %>%
+    tibble::column_to_rownames("feature_id")  %>%
+    as.matrix()
+  
+  plot_heatmap(rld_mat, paste0('top ', num, ' fluctuating features'), ...)
+
+}
+```
+
+
+```{r}
+l2fc_threshold <- 0.32
+```
+
+# QC {.tabset}
+
+```{r qc, include = TRUE,message=TRUE,eval=T,cache=F,results='asis'}
+stopifnot(exists('dds'))
+stopifnot(exists('normcounts'))
+stopifnot(exists('sampdf'))
+
+cat("## dispplot")
+#plotDispEsts(dds)
+rld <- normcounts
+cat("## outlierplot")
+if(is.null(SummarizedExperiment::assays(dds)[["cooks"]])){
+  nulltext = "Cooks distance is meaningless\n because we only have one group per sample"
+  qplot(label=nulltext,x=1,geom='text',y=1,size=I(14))+theme_bw()
+}else{
+  boxplot(log10(SummarizedExperiment::assays(dds)[["cooks"]]), range=0, las=2)
+}
+
+cat("## countdist ,warning=F")
+my_counts <-
+  DESeq2::counts(dds)%>%
+  as.data.frame() %>%
+  tibble::rownames_to_column("feature_id") %>%
+  tidyr::gather(sample_id, count, -feature_id)
+
+sample_annot <- as.data.frame(SummarizedExperiment::colData(dds))
+if(!'sample_name' %in% colnames(sample_annot)) sample_annot$sample_name<-sample_annot$sample_id
+my_counts <-
+  dplyr::left_join(my_counts, sample_annot, by = "sample_id")
+
+my_counts %>%
+  ggplot(aes(x = count + 1e-3, color = group, group = sample_name)) +
+  geom_density() +
+  scale_x_log10()
+
+my_counts %>%
+  dplyr::arrange(group) %>%
+  dplyr::mutate(sample_name = factor(sample_name, levels = unique(sample_name))) %>%
+  ggplot(aes(y = count + 1e-3, color = group, x = sample_name)) +
+  geom_violin() +
+  scale_y_log10() +
+  coord_flip()
+
+
+
+cat("## rlddf")
+stopifnot(is(rld,'DESeqTransform'))
+
+rld_df <- assay(rld)
+
+rld_df <-
+  assay(rld) %>%
+  as.data.frame() %>%
+  tibble::rownames_to_column('feature_id') %>%
+  tibble::as_data_frame() %>%
+  tidyr::gather(sample_id, reg_log_count, -feature_id)
+
+rld_df$sample_name <- sample_annot$sample_name[match(rld_df$sample_id,colData(dds)$sample_id)]
+# rld_df <- get_reg_log_counts(dds, blind = T)
+
+rld_dispersion <-
+  rld_df  %>%
+  dplyr::group_by(feature_id) %>%
+  dplyr::summarise(mean_reg_log_count = mean(reg_log_count),
+                   sd_reg_log_count = sd(reg_log_count))
+
+rld_dispersion %>%
+  ggplot(aes(y = sd_reg_log_count, x = mean_reg_log_count)) +
+  geom_point() +
+  labs(x = "mean log regularized counts", y = "standar deviation log regularized counts")
+
+
+cat("## pca, cache = F, fig_width=12,fig_height=12")
+stopifnot(colnames(rld)==colnames(dds))
+
+message('calculating PCAs')
+
+#now plot
+plotfile<- here(paste0('plots/','pca','.pdf'))
+pdf(plotfile,w=14,h=14)
+pca = DESeq2::plotPCA(rld,intgroup="group")
+pca = pca +
+  expand_limits(x = pca$data$PC1 %>%
+                  range %>%
+                  multiply_by(1.5)) +
+  expand_limits(y = pca$data$PC2 %>%
+                  range %>%
+                  multiply_by(1.3))
+print((pca+geom_text(aes(label=name),size=I(2),alpha=I(0.5)))%>%{.$layers=.$layers[-1];.+geom_point(size=I(0))}+ggtitle('PCA : labelled by group')+scale_color_discrete(guide=F))
+dev.off()
+message(normalizePath(plotfile))
+print((pca+geom_text(aes(label=name),size=I(2),alpha=I(0.5)))%>%{.$layers=.$layers[-1];.+geom_point(size=I(0))}+ggtitle('PCA : labelled by group'))
+
+
+#now plot
+library(ggrepel)
+plotfile<- here(paste0('plots/','pca_riboonly_ofilt','.pdf'))
+pdf(plotfile,w=7,h=7)
+pca = DESeq2::plotPCA(rld[,ribosamples%>%setdiff('4E_+IAA_rep3_06')],intgroup="group")
+pca = pca +
+  expand_limits(x = pca$data$PC1 %>%
+                  range %>%
+                  multiply_by(1.5)) +
+  expand_limits(y = pca$data$PC2 %>%
+                  range %>%
+                  multiply_by(1.3))
+print((pca+geom_text_repel(aes(label=name),size=I(3),alpha=I(0.5)))%>%{.$layers=.$layers[-1];.+geom_point(size=I(0))}+ggtitle('PCA : labelled by group')+scale_color_discrete(guide=F))
+dev.off()
+message(normalizePath(plotfile))
+
+
+#now plot
+library(ggrepel)
+inducecolmap <- sampdf%>%select(sample_id,induced)%>%{setNames(ifelse(.$induced=='yes','red','blue'),.$sample_id)}
+plotfile<- here(paste0('plots/','pca_riboonly_icolored','.pdf'))
+pdf(plotfile,w=7,h=7)
+pca = DESeq2::plotPCA(rld[,ribosamples%>%setdiff('4E_+IAA_rep3_06')],intgroup="group")
+pca = pca +
+  expand_limits(x = pca$data$PC1 %>%
+                  range %>%
+                  multiply_by(1.5)) +
+  expand_limits(y = pca$data$PC2 %>%
+                  range %>%
+                  multiply_by(1.3))
+print((pca+geom_text_repel(aes(label=name),alpha=I(0.5)))%>%{.$layers=.$layers[-1];.+geom_point(size=I(0),aes(color=name))}+ggtitle('PCA : labelled by group')+scale_color_manual(guide=F,values=inducecolmap))
+dev.off()
+message(normalizePath(plotfile))
+
+
+
+
+  #(pca+geom_text(aes(group),size=I(2),alpha=I(0.5))) %>% {.$layers=.$layers[-1];.+geom_point(size=I(0))} +
+#  ggtitle('PCA : labelled by samplename')
+#we also want a table with these data to pick out outliers
+pca$data %>% write_tsv(here('data/pca.tsv'))
+
+cat("## pca_grouplabel, fig_width=12,fig_height=12")
+(pca+geom_text(aes(label=group),size=I(2),alpha=I(0.5)))%>%{.$layers=.$layers[-1];.+geom_point(size=I(0))}+ggtitle('PCA : labelled by group')
+
+cat("## pca_nolabel, fig_width=12,fig_height=12")
+(pca+geom_text(aes(label=group),size=I(0),alpha=I(0.5)))%>%{.$layers=.$layers[-1];.+geom_point(size=I(3))}+ggtitle('PCA')
+
+
+cat("## heatmap")
+# dual scale settings for heatmaps
+## setting values outside of the range [z_min, z_max] to the limiting values
+if(!exists('z_max')) z_max <-  3.5
+if(!exists('z_min')) z_min <- -3.5
+# colnames(rld_df) %<>% {stringr::str_replace(.,'sample_id','sample_name')}
+plot_heatmap_fluc_features(500, rld_df, z_min = z_min, z_max = z_max)
+
+my_counts%<>%group_by(sample_name)%>%
+  mutate(countclass = case_when(
+    count > 1000 ~ '> 1000',
+    count > 100 ~ '> 100',
+    count > 32 ~ '> 32',
+    count > 8 ~ '> 8',
+    count > 0 ~ '< 8',
+    count ==0 ~ ' 0 ',
+    TRUE ~ 'NA'
+  ))
+
+my_counts$countclass%<>%factor(levels=c('> 1000','> 100','> 32','> 8','< 8',' 0 '))
+stopifnot(!any(is.na(my_counts$countclass)))
+
+
+my_counts%>%
+  group_by(sample_name,countclass)%>%tally%>%spread(countclass,n)%>%.[rev(colnames(.))]%>%select(sample_name,everything())%>%kable(label='gene count classes')
+
+```
+
+qc plots above
+
+
+# Differential expression
+
+```{r}
+resultslist%<>%map(as.data.frame)
+ trim_gids <- function(df){
+    df=as.data.frame(df);
+    df%>%mutate_at(vars(matches('gene_id|feature_id')),list(~str_replace(.,'\\.\\d+','')))
+  }
+# contrast = names(resultslist)[[4]]
+regdirfuncs = list(Up=identity,Down=function(x)x * -1)
+regdir='Up'
+for(contrast in names(resultslist)){
+  for(regdir in names(regdirfuncs)){
+    regdirfunc = regdirfuncs[[regdir]]
+    res = resultslist[[contrast]]%>%as.data.frame%>%trim_gids
+     
+    qplot(data = res, log10(baseMean), log2FoldChange , size=I(0.2), color= padj < 0.05)+theme_bw()+scale_color_manual(values=c('black','red'))
+    
+    
+    library(DT)
+      reg_features = res%>%as.data.frame%>%filter(padj<0.05,regdirfunc(log2FoldChange) > l2fc_threshold) 
+      num_reg <- nrow(reg_features)
+      
+      cat("${regdir} regulated feature: ${num_reg}")
+
+      reg_features %>% select(-matches('contrast')) %>%
+        left_join(gid2gname%>%select(gene_id,gene_name))%>%
+        select(gene_name,gene_id,baseMean,log2FoldChange,padj,everything())%>%
+        DT::datatable(rownames = F,escape = F,extensions = 'Buttons', 
+                  options = list(
+                    dom='Bfrtip',
+                    buttons = list(
+                      list(
+                        extend='csv',
+                        buttons=c('csv'),
+                        text='download')
+                    )
+                  )
+        )
+  }
+}
+
+```
+
+
+```{r,eval=TRUE,cache=TRUE}
+base::source(here('src/gofuncs.R'))
+GTOGO <- select(GTOGO,gene_name,go_id,gene_id)%>%filter(gene_id %in% (rownames(normcounts)%>%str_replace(.,'\\.\\d+','')))%>%group_by(go_id)%>%filter(n()>10)
+
+regdirfuncs = list(Up=identity,Down=function(x)x * -1)
+
+fc_df <- resultslist[["MT_vs_MB"]]
+regdirfunc=regdirfuncs[["Up"]]
+ont='BP'
+# file.remove(here('data/contrgotables.rds'))
+if(!file.exists(here('data/contrgotables.rds'))){
+  contrgotables<-mclapply(mc.cores=4,resultslist,function(fc_df){
+    map_df(.id='regdir',regdirfuncs,function(regdirfunc){
+      map_df(.id='ontology',c('BP','MF','CC')%>%setNames(.,.),function(ont){
+          siggenes = fc_df%>%{setNames((regdirfunc(.$log2FoldChange)>0) & (.$padj<0.05),.$gene_id)}
+          gotable = possibly(rungo,otherwise = NULL,quiet=TRUE)(siggenes,GTOGO,ont)
+          gotable
+          
+      })
+    })
+  })%>%bind_rows(.id='contrast')
+  saveRDS(contrgotables,here('data/contrgotables.rds'))
+}else{
+  contrgotables<-readRDS(here('data/contrgotables.rds'))
+}
+
+```
+
+
+# GO contrasts Enrichment{.tabset}
+
+```{r,eval=TRUE,results='asis',cache=TRUE}
+
+for(contr in unique(contrgotables$contrast)){
+  cat(paste0("## ",contr,'{.tabset}\n'))
+  for(regd in unique(contrgotables$regdir)){
+  cat(paste0("### ",regd,'{.tabset}\n'))
+     for(ont in unique(contrgotables$ontology)){
+  cat(paste0("#### ",ont,'\n'))
+         gotable = contrgotables%>%filter(contrast==contr,regdir==regd,ontology==ont)
+         print(plot_go_enrich(gotable,'elimFisher',paste(contr,regd,ont)))
+     }
+  }
+}
+```
+
+# GO - term table
+
+```{r,eval=TRUE,cache=TRUE}
+library(DT)
+datatable <- purrr::partial(DT::datatable,
+            extensions = 'Buttons',
+         options = list(dom = 'Blfrtip',
+                           buttons = c('csv'),
+                           lengthMenu = list(c(10,25,50,-1),
+                                             c(10,25,50,"All"))))
+
+datatable(contrgotables%>%select(ontology,contrast,regdir,GO.ID,elimFisher,Term,Enrichment,Annotated,Significant,Expected),filter=c('top'))
+```
+
+# GO - GO-gene map
+
+```{r,eval=TRUE,cache=TRUE}
+library(DT)
+gos = GTOGO$go_id%>%unique%>%intersect(keys(GOTERM))
+terms = Term(GOTERM[gos])%>%enframe('go_id','term')
+GTOGO%>%inner_join(terms,by='go_id')%>%
+datatable(filter=c('top'))
+```
+
+# Output Tables
+
+Below you can see the files into which various objects from the above analysis have been saved.
+
+```{r, echo=TRUE,include=TRUE}
+dir.create(here('tables'),showWarnings = F)
+
+#raw count data
+counts(dds)%>%as.data.frame%>%rownames_to_column('gene_id')%>%write_tsv(here('tables/rawcountdata.tsv'))
+assay(normcounts)%>%as.data.frame%>%rownames_to_column('gene_id')%>%write_tsv(here('tables/normcountdata.tsv'))
+#all coefficient, fold changes
+resultslist%>%map_df(.id='contrast',as.data.frame)%>%write_tsv(here('tables/allcontrasts.tsv'))
+
+# #mapping from GO terms to genes
+# GTOGO%>%write_tsv(here('tables/go_gene_map.tsv'))
+# #
+# contrgotables%>%write_tsv(here('tables/contrast_goenrich.tsv'))
+
+```
