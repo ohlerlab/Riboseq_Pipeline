@@ -1,12 +1,8 @@
-#note that file paths are relative to the pipeline directory
-#where the project lives
-root: "/fast/AG_Ohler/dharnet/SRP_Riboseq"
-#the genome
-REF_orig: "../ext_data/GRCh38.primary_assembly.genome.fa"
+REF_orig: "/fast/AG_Ohler/dharnet/Ebp1_Riboseq/ext_data/GRCm38.p5.genome.fa.gz"
 #annotation as gtf file - you can get these form the 
-GTF_orig: "../ext_data/gencode.v37.primary_assembly.annotation.gtf"
+GTF_orig: "/fast/AG_Ohler/dharnet/Ebp1_Riboseq/ext_data/gencode.vM12.annotation.gtf"
 #
-PCFASTA: "../ext_data/gencode.v37.pc_transcripts.fa"
+PCFASTA: "/fast/AG_Ohler/dharnet/cortexomics/ext_data/gencode.vM12.pc_transcripts.fa"
 #a file of contaminants (tRNA, rRNA etc for your organism)
 Contam: "../ext_data/contaminants.fa"
 #read lengths for cut adapt to filter out - note that we'll do further filtering later in riboseqc etc

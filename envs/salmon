@@ -1,0 +1,18 @@
+name: salmon
+channels:
+  - bioconda
+  - conda-forge
+  - defaults
+dependencies:
+  - _libgcc_mutex=0.1=conda_forge
+  - _openmp_mutex=4.5=0_gnu
+  - bzip2=1.0.8=h516909a_2
+  - icu=64.2=he1b5a44_1
+  - jemalloc=5.2.1=he1b5a44_3
+  - libgcc-ng=9.2.0=h24d8f2e_2
+  - libgomp=9.2.0=h24d8f2e_2
+  - libstdcxx-ng=9.2.0=hdf63c60_2
+  - salmon=1.2.1=hf69c8f4_0
+  - tbb=2020.1=hc9558a2_0
+  - zlib=1.2.11=h516909a_1006
+
