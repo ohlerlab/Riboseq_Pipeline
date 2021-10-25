@@ -17,6 +17,13 @@ conda activate ribopipe``
 `git branch Pipeline_Demo 
 git checkout Pipeline_Demo`
 
+- install RiboseQC and ORFquant
+```
+mkdir Applications
+git clone https://github.com/ohlerlab/RiboseQC.git Applications/RiboseQC
+git clone https://github.com/ohlerlab/ORFquant.git Applications/ORFquant
+```
+
 - Edit ``src/read_files.csv`` to point it at your fastq files (zipped or not, either is fine)- you can do this by hand, or just use a bash loop like..
 
 ``echo "sample_id,file_id,mate,pair_id" > src/read_files.csv; for fastq in /fast/dharnet/Ebp1_Riboseq/input/*fastq.gz ; do echo $(basename ${fastq%.fastq.gz}),$fastq ; done >> src/read_files.csv``
