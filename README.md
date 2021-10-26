@@ -13,6 +13,11 @@ This is the Lab's standard Ribo-seq processing pipeline, a snakemake workflow an
 ``conda create -f ribopipebase.yaml -n ribopipe;
 conda activate ribopipe``
 
+- Install our lab's packages RiboseQC, ORFquant, and Ribostan. By default, the pipeline will look for a folder above the project folder called Applications, so create this folder (in e.g. `/fast/AG_Ohler/dharnet/Applications` ) and populate it like so:  
+git clone https://github.com/ohlerlab/ORFquant  
+git clone https://github.com/ohlerlab/RiboseQC
+git clone https://github.com/zslastman/Ribostan
+
 - create a branch for this project
 `git branch Pipeline_Demo 
 git checkout Pipeline_Demo`
@@ -65,3 +70,5 @@ isriboseq - this column should be either True or False
 #code to see how many reads lost to collaps_reads
 ```Sys.glob('pipeline/collapse_reads/*/*.fastq.gz.collreadstats.txt')%>%setNames(.,basename(dirname(.)))%>%map(readLines)%>%map(head,4)%>%map(tail,2)%>%map(str_extract,'\\d+')%>%simplify2array%>%t%>%set_colnames(c('input','uniq'))%>%as.data.frame(stringsAsFactors=F)%>%rownames_to_column('sample')%>%mutate(unique = round(as.numeric(uniq)/as.numeric(input),3))```
 
+
+#To documument
