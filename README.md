@@ -1,6 +1,8 @@
 # Riboseq_Pipeline
 This is the Lab's standard Ribo-seq processing pipeline, a snakemake workflow and some R scripts, including ORFquant and RiboseQC.
 
+- Make sure you have [Miniconda3](https://docs.conda.io/en/latest/miniconda.html) working on the server
+
 - On the max cluster, get yourself a node with say 10 cores and 10 gigs each
 ``qrsh -V -now no -pe smp 8 -l  m_mem_free=10G``
 
@@ -10,21 +12,22 @@ This is the Lab's standard Ribo-seq processing pipeline, a snakemake workflow an
 `cd Pipeline_Demo`
 
 - install the base conda environment if it's not already installed, and then activate it
-``conda create -f ribopipebase.yaml -n ribopipe;
+``conda env create -f ribopipebase.yml -n ribopipe;
 conda activate ribopipe``
 
 - create a branch for this project
-`git branch Pipeline_Demo 
-git checkout Pipeline_Demo`
+``git branch Pipeline_Demo``
+``git checkout Pipeline_Demo``
 
 - install RiboseQC and ORFquant
 ```
 mkdir Applications
 git clone https://github.com/ohlerlab/RiboseQC.git Applications/RiboseQC
 git clone https://github.com/ohlerlab/ORFquant.git Applications/ORFquant
+git clone https://github.com/zslastman/Ribostan.git Applications/Ribostan
 ```
 
-- Edit ``src/read_files.csv`` to point it at your fastq files (zipped or not, either is fine)- you can do this by hand, or just use a bash loop like..
+- Edit ``src/read_files.csv`` to point it to your fastq files (zipped or not, either is fine)- you can do this by hand, or just use a bash loop like..
 
 ``echo "sample_id,file_id,mate,pair_id" > src/read_files.csv; for fastq in /fast/dharnet/Ebp1_Riboseq/input/*fastq.gz ; do echo $(basename ${fastq%.fastq.gz}),$fastq ; done >> src/read_files.csv``
 
