@@ -41,14 +41,10 @@ It has columns: ``sample_id,file_id,mate,pair_id``
 
 Edit sample_parameter.csv. This has a few columns
 
-- `sample_id` Same as sample_id in read_files.tsv
-
-- `libtype` [see here](https://salmon.readthedocs.io/en/latest/library_type.html), this tells salmon (and some other rules in the snakemake file) what kind of library it is
-this will vary from library to library, but most frequently you'll have SF for Riboseq (single end forward strand) and SR or SF for the matching RNAseq.
-
-
-group - this column groups your biological replicates together.
-isriboseq - this column should be either True or False
+- `sample_id` Same as sample_id in read_files.tsv.
+- `libtype` [see here](https://salmon.readthedocs.io/en/latest/library_type.html), tells salmon (and some other rules in the snakemake file) what kind of library it is. This will vary from library to library, but most frequently you'll have SF for Riboseq (single end forward strand) and SR or SF for the matching RNAseq.
+- `group` groups your biological replicates together.
+- `isriboseq` should be either True or False when the sample is Riboseq or RNAseq respectively.
 
 - Edit config.yaml - see the comments in file, this is wehre you put in e.g. the path to annotation, genome sequence, etc.
 
