@@ -140,13 +140,22 @@ MINREADLENGTH=config['MINREADLENGTH']
 MAXREADLENGTH=config['MAXREADLENGTH']
 QUALLIM=config['QUALLIM']
 
+
+## copy_ref: create a plain text copy of the reference genome file in
+## case it is in a compressed format and use samtools to generate its
+## index. These will be used later for mapping with STAR.
+
 rule copy_ref:
   input: REF_orig
   output: REF,str(REF)+'.fai'
   shell: """
-      zless {REF_orig} >  {output[0]}
+      zless {REF_orig} > {output[0]}
       samtools faidx {output[0]}
       """
+
+
+## link_in_anno: check the annotation file for consistency with the
+## reference genome file in naming chromosomes.
 
 rule link_in_anno:
   input: REF_orig=REF_orig,GTF=GTF,REFAI=str(REF)+'.fai'
@@ -183,6 +192,10 @@ rule link_in_anno:
     assert not problems.any(),print("\n\n\n GTF, Chromosomes Don't quite match here: \n\n",allchrs[problems],"\n\n")
 
 
+## link_in_files: make a preprocessed_reads/ directory for each sample
+## and place a symbolic link to the unprocessed raw data (i.e.
+## *.fastq.gz file) in each directory to have a nice project structure.
+
 def name_preprocessed_reads(wc):
   filedf = seqfilesdf[seqfilesdf.sample_id==wc['sample']]  
   assert (filedf.file_id  == wc['fastq']).sum()==1, "Fastq file isn't amongst the file ids"
@@ -200,6 +213,12 @@ rule link_in_files:
       ln -sf $(readlink -f {input} {output} )
     """)
 
+
+## cutadapt_reads: use cutadapt to trim off the adapter sequence
+## specified as ADAPTERSEQ in config.yaml from all reads. Resulting
+## trimmed reads that are shorter than MINREADLENGTH or longer than
+## MAXREADLENGTH are discarded. Furthermore, bases on the 3' end with
+## quality scores lower than QUALLIM are trimmed.
 
 ADAPTERSEQ=config['ADAPTERSEQ']
 
@@ -228,8 +247,11 @@ rule cutadapt_reads:
       gzip -l {output}.tmp  | awk 'NR==2 {{exit( $2 != 0) }}' && rm {output}.tmp
 
       mv {output}.tmp {output}
-
 """
+
+
+## collapse_reads: collapse duplicate reads based on their UMI sequence
+## (if you are using UMIs).
 
 rule collapse_reads:
     input: 'cutadapt_reads/{sample}/{fastq}'
@@ -245,8 +267,11 @@ rule collapse_reads:
          2> collapse_reads/{wildcards.sample}/{wildcards.fastq}.collreadstats.txt \
          | gzip > {output}
      """
-        
-#
+
+
+## trim_reads: trim off the 8 nucleotides of the UMI sequences from
+## reads (if you are using UMIs).
+
 rule trim_reads:
     input: 'collapse_reads/{sample}/{fastq}'
     output: 'trim_reads/{sample}/{fastq}'
@@ -263,15 +288,18 @@ rule trim_reads:
           gzip -f {output}
           mv {output}.gz {output}
      """)
-#
-
-
-
 
 
 ##########################################################
-######### trna/rRNA filtering with bowtie
+######### trna/rRNA filtering with STAR
 ##########################################################
+
+
+## number_contaminants: read in fasta file of tRNA and rRNA contaminant
+## sequences specified as Contam in config.yaml. Assign a number to
+## each unique sequence. Create a new fasta file of these numbered
+## sequences within the pipeline structure.
+
 rule number_contaminants:
   input: contaminants=config['Contam']
   output: 'tRNA_rRNA_index/tRNA_rRNA_index.fa',
@@ -288,8 +316,12 @@ rule number_contaminants:
       writeXStringSet(seq,"{output}");
       write.table(col.names=F,row.names=F,data.frame(names(seq)),"tRNA_rRNA_index.names.txt");
     ' 
-
     """
+
+
+## make_trna_rrna_indices: use STAR to generate index of tRNA and rRNA
+## contaminant sequences. We are handling the contaminant fasta file as
+## a reference genome file.
 
 rule make_trna_rrna_indices:
   input: 'tRNA_rRNA_index/tRNA_rRNA_index.fa'
@@ -305,6 +337,11 @@ rule make_trna_rrna_indices:
     --genomeDir {params.outprefix} \
     --genomeFastaFiles {input}
     """
+
+
+## filter_tRNA_rRNA: use STAR to map reads to contaminant sequences.
+## Use samtools to discard reads that successfully mapped to
+## contaminant sequences.
 
 rule filter_tRNA_rRNA: 
   input: 'trim_reads/{sample}/{fastq}','tRNA_rRNA_index/tRNA_rRNA_index.done'  
@@ -360,11 +397,14 @@ rule filter_tRNA_rRNA:
 
     samtools stats {output[0]}.filtered_reads.bam > {output[0]}.filtered_reads.bam.stats
     #samtools stats {output[0]}.filtered_reads.bam
-
     """
     #rename unmapped to the output
 
-#this rule is the 'signal spliter where we go from sample to indiv fastqs
+
+## link_processed_reads: create a single directory for each sample with
+## all relevant fastq files of processed reads inside. This rule is the
+## signal splitter where we go from sample to individual fastq files.
+
 def choose_processed_reads(wc,config=config):
   #correct zcat strings based on read pairs
   filedf = (seqfilesdf.loc[[wc['sample']]])
@@ -385,6 +425,7 @@ rule link_processed_reads:
         for i in $(readlink -f {input} ); do  ln -rifs $i  {output} ; done
     """)
     assert Path(output[0]).stat().st_size > 100
+
 
 ################################################################################
 ########Annotation
