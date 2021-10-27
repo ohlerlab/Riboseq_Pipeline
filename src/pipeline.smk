@@ -865,7 +865,8 @@ rule salmon:
       --validateMappings
 """
 
-RIBOSTANPACKAGE = '../../RiboEM'
+
+RIBOSTANPACKAGE = config['RibostanPACKAGE']
 
 rule ribostan:
   input:

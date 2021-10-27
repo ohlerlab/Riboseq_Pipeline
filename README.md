@@ -34,10 +34,10 @@ git clone https://github.com/zslastman/Ribostan.git Applications/Ribostan
 
 It has columns: ``sample_id,file_id,mate,pair_id`` 
 
-- ``sample_id`` identifies all samples, technical replicates will get the same name, 
+- ``sample_id`` identifies all samples, technical replicates will get the same name as well ass the paired end files.
 - ``file_id`` is the file path
 - ``mate`` identifys which end for paired end reads (1 or 2)
-- ``pair_id`` groups paired end samples.
+- ``pair_id`` groups paired end samples (the pair get the idential number)
 
 - Edit sample_parameter.csv. This has a few columns
 

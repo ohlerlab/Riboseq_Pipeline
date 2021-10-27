@@ -4,7 +4,7 @@ GTF_orig: "/fast/AG_Ohler/Riboseq_Pipeline_Data/ext_data/gencode.vM12.annotation
 #
 PCFASTA: "/fast/AG_Ohler/Riboseq_Pipeline_Data/ext_data/gencode.vM12.pc_transcripts.fa"
 #a file of contaminants (tRNA, rRNA etc for your organism)
-Contam: "/fast/AG_Ohler/Riboseq_Pipeline_Data/ext_data/contaminants.fa"
+Contam: "../ext_data/contaminants.fa"
 #read lengths for cut adapt to filter out - note that we'll do further filtering later in riboseqc etc
 MINREADLENGTH: 18
 MAXREADLENGTH: 100
