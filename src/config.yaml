@@ -22,6 +22,7 @@ ADAPTERSEQ: "TGGAATTCTCGGGTGCCAAGG"
 #points towards installations of riboseqc and ORFquant
 RIBOSEQCPACKAGE: "../../Applications/RiboseQC/"
 ORFquantPACKAGE: "../../Applications/ORFquant/"
+RibostanPACKAGE: "../../Applications/Ribostan/"
 #this can be used to bypass some of the riboseq steps if necessary
 #leave as filter_reads for full pipeline, cutadapt reads if you have no UMIs.
 FILT_RIBO_FOLDER: "filter_reads"

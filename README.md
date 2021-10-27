@@ -27,25 +27,25 @@ git clone https://github.com/ohlerlab/ORFquant.git Applications/ORFquant
 git clone https://github.com/zslastman/Ribostan.git Applications/Ribostan
 ```
 
-- Edit ``src/read_files.csv`` to point it to your fastq files (zipped or not, either is fine)- you can do this by hand, or just use a bash loop like..
+- Edit ``src/read_files.tsv`` to point it to your fastq files (zipped or not, either is fine)- you can do this by hand, or just use a bash loop like..
 
 ``echo "sample_id,file_id,mate,pair_id" > src/read_files.csv; for fastq in /fast/dharnet/Ebp1_Riboseq/input/*fastq.gz ; do echo $(basename ${fastq%.fastq.gz}),$fastq ; done >> src/read_files.csv``
 
 
 It has columns: ``sample_id,file_id,mate,pair_id`` 
 
-- ``sample_id`` identifies all samples, technical replicates will get the same name as well ass the paired end files.
+- ``sample_id`` The id which links fastq files to a biological sample. Paired-end mates, as well as technical replicates (resequencing) will have the same sample_id and e.g. fastqc will combine them.
 - ``file_id`` is the file path
 - ``mate`` identifys which end for paired end reads (1 or 2)
 - ``pair_id`` groups paired end samples (the pair get the idential number)
 
-- Edit sample_parameter.csv. This has a few columns
+Edit sample_parameter.csv. This has a few columns
 
-sample_id - the id which links fastq files to a biological sample. Paired-end mates, as well as technical replicates (resequencing) will have the same sample_id and e.g. fastqc will combine them.
+- `sample_id` Same as sample_id in read_files.tsv
 
-libtype - see here, this tells salmon (and some other rules in the snakemake file) what kind of library it is
+- `libtype` [see here](https://salmon.readthedocs.io/en/latest/library_type.html), this tells salmon (and some other rules in the snakemake file) what kind of library it is
 this will vary from library to library, but most frequently you'll have SF for Riboseq (single end forward strand) and SR or SF for the matching RNAseq.
-https://salmon.readthedocs.io/en/latest/library_type.html
+
 
 group - this column groups your biological replicates together.
 isriboseq - this column should be either True or False
