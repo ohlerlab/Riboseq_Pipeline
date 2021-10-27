@@ -29,15 +29,17 @@ git clone https://github.com/zslastman/Ribostan.git Applications/Ribostan
 
 - Edit ``src/read_files.tsv`` to point it to your fastq files (zipped or not, either is fine)- you can do this by hand, or just use a bash loop like..
 
-``echo "sample_id,file_id,mate,pair_id" > src/read_files.csv; for fastq in /fast/dharnet/Ebp1_Riboseq/input/*fastq.gz ; do echo $(basename ${fastq%.fastq.gz}),$fastq ; done >> src/read_files.csv``
-
+```
+echo "sample_id,file_id,mate,pair_id" > src/read_files.csv; for fastq in /fast/dharnet/Ebp1_Riboseq/input/*fastq.gz ; do echo $(basename ${fastq%.fastq.gz}),$fastq ; done >> src/read_files.csv
+```
 
 It has columns: ``sample_id,file_id,mate,pair_id`` 
-
-- ``sample_id`` The id which links fastq files to a biological sample. Paired-end mates, as well as technical replicates (resequencing) will have the same sample_id and e.g. fastqc will combine them.
-- ``file_id`` is the file path
-- ``mate`` identifys which end for paired end reads (1 or 2)
-- ``pair_id`` groups paired end samples (the pair get the idential number)
+|read_files.tsv layout||
+|:---:|:---:|
+|``sample_id``|The id which links fastq files to a biological sample. Paired-end mates, as well as technical replicates (resequencing) will have the same sample_id and e.g. fastqc will combine them.|
+|``file_id``| the file path|
+|``mate``|identifys which end for paired end reads (1 or 2)|
+|``pair_id``|groups paired end samples (the pair get the idential number)|
 
 Edit sample_parameter.csv. This has a few columns
 
