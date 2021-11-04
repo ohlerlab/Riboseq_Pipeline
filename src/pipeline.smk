@@ -5,9 +5,7 @@ from pathlib import Path
 from functools import partial
 from ipdb import set_trace
 
-#### conda install -c bioconda subread needed
-#### conda install -c bioconda ucsc-gtftogenepred same
-#### conda install -c bioconda fastqc
+singularity: "docker://dermotharnett/riboseq_pipeline"
 
 #print('warning - sampling the first 100k reads');HEADIFTEST = '| head -n 400000'
 HEADIFTEST = ''
@@ -32,8 +30,9 @@ shell.prefix("set -e pipefail;")
 ################################################################################
  
 
-configfile: "../src/config.yaml"
+configfile: "../config/config.yaml"
 
+PROJECTFOLDER=config['PROJECTFOLDER']
 TMPDIR = Path('../tmp')
 
 seqfilesdf = pd.read_csv(config['sample_files'],dtype=str).set_index("sample_id", drop=False)
@@ -97,6 +96,7 @@ rnasamples = sampledf.sample_id[~sampledf.isriboseq]
 #for trimming CDS for riboseq
 REF_orig=config['REF_orig']
 GTF_orig=config['GTF_orig']
+ORFEXT_FASTA=Path(GTF_orig.replace('.gtf','.orfext.fa')).name
 
 assert(Path(GTF_orig).exists()), GTF_orig + ", the GTF file, doesn't exist"
 
@@ -133,7 +133,7 @@ rule all:
     # ("multiqc/multiqc_report.html"),
     expand("ORFquant/{sample}/.done", sample = ribosamples),
     expand('riboseqc/data/{sample}/.done', sample=ribosamples),
-    expand('salmon/data/{sample}/.done',sample=rnasamples),
+    expand('salmon/data/{sample}/quant.sf',sample=rnasamples),
     expand('ribostan/{sample}/{sample}.ribostan.tsv', sample=ribosamples)
 
 MINREADLENGTH=config['MINREADLENGTH']
@@ -326,12 +326,13 @@ rule number_contaminants:
 rule make_trna_rrna_indices:
   input: 'tRNA_rRNA_index/tRNA_rRNA_index.fa'
   output: touch('tRNA_rRNA_index/tRNA_rRNA_index.done'),
-  conda: '../envs/star'
+  # conda: '../envs/star'
   threads: 8
   params:
     outprefix = lambda wc,output: output[0].replace('/tRNA_rRNA_index.done',''), 
   shell: r"""
     STAR \
+    --genomeSAindexNbases 9 \ 
     --runThreadN {threads} \
     --runMode genomeGenerate \
     --genomeDir {params.outprefix} \
@@ -346,7 +347,7 @@ rule make_trna_rrna_indices:
 rule filter_tRNA_rRNA: 
   input: 'trim_reads/{sample}/{fastq}','tRNA_rRNA_index/tRNA_rRNA_index.done'  
   output: 'filter_reads/{sample}/{fastq}'
-  conda: '../envs/star'
+  # conda: '../envs/star'
   threads: 8
   params:
     indexname = lambda wc,input: input[1].replace('.done',''),
@@ -434,7 +435,7 @@ rule link_processed_reads:
 rule makeGTF:
   input: GTF=GTF_orig
   output: GTF
-  conda: '../envs/gffread'
+  # conda: '../envs/gffread'
   #conda: '~/miniconda3/envs/seq/bin/gffread'
   shell: r""" 
       # set -x
@@ -525,7 +526,7 @@ rule star_index:
  input: REF=ancient(REF),GTF=ancient(GTF)
  output: touch('starindex/starindex.done')
  threads: 8
- conda: "../envs/star"
+ # conda: "../envs/star"
  shell: r"""
    STAR \
      --runThreadN {threads} \
@@ -557,7 +558,7 @@ rule star:
      output:
           done = touch('star/data/{sample,[^/]+}/.done'),bam='star/data/{sample}/{sample}.bam',bai='star/data/{sample}/{sample}.bam.bai'
      threads: 8
-     conda: "../envs/star"
+     # conda: "../envs/star"
      #please check params, there is a lot of stuff i did.
      params:
         sample= lambda wc: wc['sample'],
@@ -673,7 +674,7 @@ rule qc:
           read_duplication= config['rnaseqpipescriptdir']+"read_duplication.sh",
      output:
           'qc/data/{sample}/read_alignment_report.tsv',done=touch('qc/data/{sample}/.done')
-     conda: '../envs/picard'
+     # conda: '../envs/picard'
      resources:
      params:
         singleendflag = lambda wc: ' -e ' if sampledf.libtype.str.match('^[SU]')[wc.sample]  else '',
@@ -763,7 +764,6 @@ rule make_riboseqc_anno:
   shell:r"""
     set -x
     awk -vOFS="\t" '{{print $1,0,$2}}' {REF}.fai | bedtools intersect -b - -a {GTF} > {params.gtfmatchchrs} 
-    R -e 'if (! "RiboseQC" %in% installed.packages()) devtools::install("{RIBOSEQCPACKAGE}",upgrade="never")'
     mkdir -p $(dirname {output[0]})
     R -e 'devtools::load_all("{RIBOSEQCPACKAGE}");args(prepare_annotation_files) ;prepare_annotation_files(annotation_directory=".",gtf_file="{params.gtfmatchchrs}",annotation_name="{params.annobase}",forge_BS=FALSE, genome_seq=FaFile("{REF}"))'
  """
@@ -796,7 +796,6 @@ rule run_ORFquant:
   shell:r"""
     set -ex
       mkdir -p {params.outputdir}
-      R -e 'if (! "ORFquant" %in% installed.packages()) devtools::install("{ORFquantPACKAGE}",upgrade="never")'
 
       R -e 'devtools::load_all("{ORFquantPACKAGE}");run_ORFquant(for_ORFquant_file = {params.for_ORFquantfile},annotation_file = "{input.annofile}", n_cores = {threads},prefix="{params.outputdir}") '
         
@@ -808,17 +807,16 @@ rule run_ORFquant:
 
 rule make_orf_fasta:
   input: gtf=GTF_orig,fasta=REF
-  params:
-    prefix = lambda wc,input: touch(input.gtf.replace('.gtf','.orfext')) 
-  output: fasta=GTF_orig.replace('.gtf','.orfext.fa')
+  output: fasta=ORFEXT_FASTA
   shell:r"""set -ex
-  Rscript ../src/orfext.R --gtf {input.gtf} --fafile {input.fasta} --outprefix {params.prefix} 
+  mkdir -p $(dirname {output.fasta})
+  R -e 'devtools::load_all("{RIBOSTANPACKAGE}");make_ext_fasta(gtf="{input.gtf}",fa="{input.fasta}",out="{output.fasta}")'
   """
 
 rule star_transcript_index:
-  input: fasta = lambda wc:  GTF_orig.replace('.gtf','.orfext.fa') if wc['sequences'] == 'ORFext' else PCFASTA_tname
+  input: fasta = lambda wc:  ORFEXT_FASTA if wc['sequences'] == 'ORFext' else PCFASTA_tname
   output: directory('StarIndex/{sequences}')
-  conda: "../envs/star"
+  # conda: "../envs/star"
   threads: 15
   shell:r"""
     mkdir -p {output}
@@ -838,7 +836,7 @@ rule star_transcript:
   output: 
     bam='star/{sequences}/data/{sample}/{sample}.bam',
     bai='star/{sequences}/data/{sample}/{sample}.bam.bai',
-  conda: "../envs/star"
+  # conda: "../envs/star"
   params:
     bamnosort=lambda wc,output: output.bam.replace('.bam','nosort.bam')
   shell:r"""
@@ -878,7 +876,7 @@ rule make_salmon_index:
   threads: 8
   input: config['PCFASTA']
   output: salmonindex = touch('salmonindex/.done')
-  conda: '../envs/salmon'
+  # conda: '../envs/salmon'
   shell:r""" salmon index -p {threads}  -k 21 -t {input} -i salmonindex"""
 
 rule salmon:
@@ -888,10 +886,9 @@ rule salmon:
     salmonindex = 'salmonindex',
     lib = lambda wc: sampledf.loc[wc['sample'],'libtype']
   output:
-      done = touch('salmon/data/{sample}/.done'),
       quant = touch('salmon/data/{sample}/quant.sf')
   threads: 4
-  conda:'../envs/salmon'
+  # conda:'../envs/salmon'
   shell:r"""
       set -ex
       mkdir -p salmon/reports/{wildcards.sample}
@@ -912,7 +909,7 @@ RIBOSTANPACKAGE = config['RibostanPACKAGE']
 rule ribostan:
   input:
     ribobam = 'star/ORFext/data/{sample}/{sample}.bam',
-    ribofasta = GTF_orig.replace('.gtf','.orfext.fa')
+    ribofasta = ORFEXT_FASTA
   threads:4
   # conda: '../envs/ribostan'
   output: efile = 'ribostan/{sample}/{sample}.ribostan.tsv'
@@ -922,3 +919,47 @@ rule ribostan:
   """
 
 
+################################################################################
+########Downstream analysis
+################################################################################
+rule read_countdata:
+  input:
+    salmon = expand('salmon/data/{sample}/quant.sf', sample=ribosamples),
+    ribostan = expand('ribostan/{sample}/{sample}.ribostan.tsv', sample=rnasamples)
+  threads:4
+  output: 
+    'r_data/tx_countdata.rds',
+    'r_data/iso_tx_countdata.rds',
+    'r_data/gtf_gr.rds'
+  shell: r"""
+    Rscript ../src/read_countdata.R 
+  """
+
+# rule run_deseq:
+#   input:
+#     ribobam = 'star/ORFext/data/{sample}/{sample}.bam',
+#     ribofasta = ORFEXT_FASTA
+#   threads:4
+#   # conda: '../envs/ribostan'
+#   output: efile = 'ribostan/{sample}/{sample}.ribostan.tsv'
+#   shell: r"""
+#   Rscript ../src/run_deseq.R 
+#   """
+
+rule deseq_report:
+  input:
+   'r_data/tx_countdata.rds','r_data/dds.rds','r_data/'
+  threads:4
+  output: report = 'deseq_report/ribo_de_report.html'
+  shell: r"""
+  R -e '
+  rmarkdown::render(
+          "ribo_de_report.Rmd",
+          output_format = "html",
+          output_file="{output.report}",
+          output_dir = dirname("{output.report}"),
+          intermediates_dir = dirname("{output.report}"),
+          knit_root_dir = dirname("{output.report}")
+  )
+  '
+  """

@@ -23,6 +23,10 @@ RUN mamba install -c bioconda bedtools
 RUN mamba install -c bioconda samtools
 RUN conda clean --all
 
+RUN apt-get update && apt-get install less
+RUN mamba install perl
+RUN mamba install -y -c conda-forge -c bioconda tbb=2020.2 salmon=1.4.0
+RUN mamba install -y -c conda-forge ipython ipdb pandas pathlib
 
 CMD /bin/bash "$@"
 
