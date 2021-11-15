@@ -332,7 +332,7 @@ rule make_trna_rrna_indices:
     outprefix = lambda wc,output: output[0].replace('/tRNA_rRNA_index.done',''), 
   shell: r"""
     STAR \
-    --genomeSAindexNbases 9 \ 
+    --genomeSAindexNbases 9 \
     --runThreadN {threads} \
     --runMode genomeGenerate \
     --genomeDir {params.outprefix} \
