@@ -33,10 +33,7 @@ shell.prefix("set -e pipefail;")
  
 
 configfile: "../src/config.yaml"
-config['root'] = Path(config['root'])
 
-snakedir = Path(config['root']).resolve() / 'pipeline'
-assert snakedir.exists
 TMPDIR = Path('../tmp')
 
 seqfilesdf = pd.read_csv(config['sample_files'],dtype=str).set_index("sample_id", drop=False)
@@ -602,7 +599,7 @@ rule star:
 
   
 rrna_intervals = 'qc/picard_rrna_intervals.txt'
-refflat = snakedir/ 'qc' / Path(GTF).with_suffix('.refflat').name
+refflat = Path('qc') / Path(GTF).with_suffix('.refflat').name
 #refflat = snakedir/ 'qc' / Path(config['GFF_orig']).with_suffix('.refflat').name
 
 rule make_picard_files:
@@ -881,6 +878,5 @@ rule ribostan:
     mkdir -p $( dirname {output.efile} ) 
     R -e 'devtools::load_all("{RIBOSTANPACKAGE}");get_exprfile("{input.ribobam}", "{input.ribofasta}", "{output.efile}")'
   """
-
 
 
