@@ -18,10 +18,11 @@ library(tidyverse)
 select <- dplyr::select
 slice <- dplyr::slice
 #
-
 fafile <- here(paste0('pipeline/',basename(yaml::yaml.load_file(here('src/config.yaml'))$REF)))
 fafileob <- FaFile(fafile)
 
+gtf <- here(paste0('pipeline/',basename(yaml::yaml.load_file(here('src/config.yaml'))$GTF)))
+if(!exists('gtf_gr')) gtf_gr <- rtracklayer::import(gtf)
 
 source('src/functions.R')
 #

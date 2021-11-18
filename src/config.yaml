@@ -2,11 +2,11 @@
 #where the project lives
 root: "/fast/AG_Ohler/dharnet/SRP_Riboseq"
 #the genome
-REF_orig: "../ext_data/GRCh38.primary_assembly.genome.fa"
+REF_orig: "../ext_data/GRCh37.p13.genome.fa.gz"
 #annotation as gtf file - you can get these form the 
-GTF_orig: "../ext_data/gencode.v37.primary_assembly.annotation.gtf"
+GTF_orig: "../ext_data/gencode.v19.annotation.gtf.gz"
 #
-PCFASTA: "../ext_data/gencode.v37.pc_transcripts.fa"
+PCFASTA: "../ext_data/gencode.v19.pc_transcripts.fa"
 #a file of contaminants (tRNA, rRNA etc for your organism)
 Contam: "../ext_data/contaminants.fa"
 #read lengths for cut adapt to filter out - note that we'll do further filtering later in riboseqc etc
