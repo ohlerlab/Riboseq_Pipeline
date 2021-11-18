@@ -1,6 +1,6 @@
 #note that file paths are relative to the pipeline directory
 #where the project lives
-root: "/fast/AG_Ohler/dharnet/SRP_Riboseq"
+PROJECTFOLDER: "/fast/AG_Ohler/dharnet/SRP_Riboseq"
 #the genome
 REF_orig: "../ext_data/GRCh37.p13.genome.fa.gz"
 #annotation as gtf file - you can get these form the 
@@ -15,8 +15,8 @@ MAXREADLENGTH: 100
 #quality liit for cutadapt
 QUALLIM: 20
 #
-sample_files: "../src/read_files.csv"
-sample_parameter: "../src/sample_parameter.csv"
+sample_files: "../config/read_files.csv"
+sample_parameter: "../config/sample_parameter.csv"
 #option to replace multiqc with ones own command (you can ignore unless you want to tweak the reports yourself)
 multiqcscript: 'multiqc'
 #this has some scripts for QC etc.
@@ -26,6 +26,7 @@ ADAPTERSEQ: "TGGAATTCTCGGGTGCCAAGG"
 #points towards installations of riboseqc and ORFquant
 RIBOSEQCPACKAGE: "../../Applications/RiboseQC/"
 ORFquantPACKAGE: "../../Applications/ORFquant/"
+RibostanPACKAGE: "../../Applications/Ribostan/"
 #this can be used to bypass some of the riboseq steps if necessary
 #leave as filter_reads for full pipeline, cutadapt reads if you have no UMIs.
 FILT_RIBO_FOLDER: "filter_reads"
