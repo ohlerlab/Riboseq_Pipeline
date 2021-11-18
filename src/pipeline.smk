@@ -332,7 +332,7 @@ rule make_trna_rrna_indices:
     outprefix = lambda wc,output: output[0].replace('/tRNA_rRNA_index.done',''), 
   shell: r"""
     STAR \
-    --genomeSAindexNbases 9 \ 
+    --genomeSAindexNbases 9 \
     --runThreadN {threads} \
     --runMode genomeGenerate \
     --genomeDir {params.outprefix} \
@@ -797,8 +797,9 @@ rule run_ORFquant:
     set -ex
       mkdir -p {params.outputdir}
 
-      R -e 'devtools::load_all("{ORFquantPACKAGE}");run_ORFquant(for_ORFquant_file = {params.for_ORFquantfile},annotation_file = "{input.annofile}", n_cores = {threads},prefix="{params.outputdir}") '
-        
+      R -e 'devtools::load_all("{RIBOSEQCPACKAGE}");devtools::load_all("{ORFquantPACKAGE}");run_ORFquant(for_ORFquant_file = {params.for_ORFquantfile},annotation_file = "{input.annofile}", n_cores = {threads},prefix="{params.outputdir}") '
+      
+      [ -f ORFquant/{sample}/final_ORFquant_results ] || exit
       """
 
 ##########################################################################
