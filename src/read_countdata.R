@@ -3,21 +3,22 @@ library(tximport)
 source(here::here('src/Rprofile.R'))
 source(here::here('src/functions.R'))
 
-# if(!exists('gtf_gr')) gtf_gr <- rtracklayer::import('')
 
-#
+gtf <- here(paste0('pipeline/',basename(yaml::yaml.load_file(here('src/config.yaml'))$GTF_orig)))
+stopifnot(file.exists(gtf))
+if(!exists('gtf_gr')) gtf_gr <- rtracklayer::import(gtf)
 
-ribostanfiles <- Sys.glob('ribostan/data/rna*/quant.sf')
-sampleinfo <- read_csv('../src/sample_parameter.csv')
+
+sampleinfo <- read_csv(here('src/sample_parameter.csv'))
 ribosamples <- sampleinfo%>%filter(isriboseq)%>%.$sample_id
 rnasamples <- sampleinfo%>%filter(!isriboseq)%>%.$sample_id
-salmonfiles <- paste0('salmon/data/',rnasamples,'/quant.sf')
-ribostanfiles <- paste0('ribostan/',ribosamples,'/',ribosamples,'.ribostan.tsv')
-stopifnot(all(file.exists(salmonfiles)))
-stopifnot(all(file.exists(ribostanfiles)))
-
-#
+salmonfiles <- ''[0]
+if(length(rnasamples)>0) salmonfiles <- paste0('salmon/data/',rnasamples,'/quant.sf')
+if(length(salmonfiles)>0) stopifnot(all(file.exists(salmonfiles)))
+ribostanfiles <- here(paste0('pipeline/ribostan/',ribosamples,'/',ribosamples,'.ribostan.tsv'))
+if(length(ribostanfiles)>0) stopifnot(all(file.exists(ribostanfiles)))
 countdatafiles <- c(salmonfiles,ribostanfiles)
+#
 
 ################################################################################
 ########Now load annotation data
@@ -26,71 +27,47 @@ countdatafiles <- c(salmonfiles,ribostanfiles)
 tx2genetbl = gtf_gr%>%mcols%>%as.data.frame%>%filter(!is.na(gene_id),!is.na(transcript_id))%>%
 	distinct(transcript_id,gene_id)%>%select(transcript_id,gene_id)
 trid2gid=tx2genetbl%>%{setNames(.$gene_id,.$transcript_id)}
-salmontrs =  salmonfiles[1]%>%read_tsv%>%.$Name%>%str_extract('[^|]+')
-salmoncds = salmontrs%>%intersect(gtf_gr%>%subset(type=='CDS')%>%.$transcript_id)
-# cdswidth = gtf_gr%>%subset(type=='CDS')%>%split(.,.$transcript_id)%>%width%>%sum
-# cdsrangedf <- tibble(Name=salmoncds,annolength = cdswidth[salmoncds])
-# cdsrangedf$Name%<>%trimids
-# trs = cdsrangedf$Name
-trs = salmontrs
-
+#
+ribostantrs = ribostanfiles[1]%>%read_tsv%>%.$Name
+trs = ribostantrs
+if(length(salmonfiles)>0){
+	salmontrs =  salmonfiles[1]%>%read_tsv%>%.$Name%>%str_extract('[^|]+')
+	salmoncds = salmontrs%>%intersect(gtf_gr%>%subset(type=='CDS')%>%.$transcript_id)
+	# cdswidth = gtf_gr%>%subset(type=='CDS')%>%split(.,.$transcript_id)%>%width%>%sum
+	# cdsrangedf <- tibble(Name=salmoncds,annolength = cdswidth[salmoncds])
+	# cdsrangedf$Name%<>%trimids
+	# trs = cdsrangedf$Name
+	trs = intersect(ribostantrs,salmontrs)
+}
+trid2gid = trid2gid[trs] 
 #we have to trim the ids for orfquant
 tx2genetbl$transcript_id%<>%trimids
 tx2genetbl$gene_id%<>%trimids
-}
 
 ################################################################################
-########Collect transript level info for top transcripts
+########Collect transcript level info for top transcripts
 ################################################################################
-tximport(ribostanfiles)
-filereadfunc <- function(file){
-		if(file%>%str_detect('ribotrans')){
-			message(str_interp('reading riboemfile ${file}'))
-			ribotransexprtbl = read_tsv(file)
-			outtable<-tibble(
-				Name = ribotransexprtbl$tr_id,
-				Length = ribotransexprtbl$cds_len,
-				EffectiveLength = ribotransexprtbl$cds_len,
-				NumReads = ribotransexprtbl$read_count
-			)%>%mutate(
-				TPM=(NumReads/EffectiveLength)%>%{1e6*./sum(.)}
-			)
-		}
-		else{
-			outtable = file%>%
-				read_tsv()
-			outtable <- outtable %>% mutate(Name=str_extract(Name,'[^|]+'))
-		}
-		outtable$Name%<>%trimids
-		full_outtable = cdsrangedf%>%safe_left_join(allow_missing=TRUE,outtable)
-		# stopifnot(full_outtable$NumReads%>%is.na%>%mean%>%`>`(0.8))
-		full_outtable$NumReads%<>%replace_na(0)
-		full_outtable$TPM%<>%replace_na(0)
-		full_outtable$Length%<>%{.[is.na(.)]<-full_outtable$annolength[is.na(.)];.}
-		full_outtable$EffectiveLength%<>%{.[is.na(.)]<-full_outtable$Length[is.na(.)];.}
-		full_outtable$NumReads%>%sum(na.rm=T)%>%`>`(0)
-		full_outtable%>%select(Name,Length,EffectiveLength,TPM,NumReads)
-}
 
+countdatafiles%<>%setNames(.,basename(dirname(.)))
 tx_countdata = tximport(files=countdatafiles,
 	ignoreTxVersion=TRUE,
 	tx2gene=tx2genetbl,
 	type='salmon',
-	countsFromAbundance='scaledTPM',
+	# countsFromAbundance='scaledTPM',
 	ignoreAfterBar=TRUE,
-	importer=filereadfunc)
-
-tx_countdata$counts%>%apply(2,sum,na.rm=T)%>%divide_by(1e6)
+	# importer=filereadfunc
+)
 
 iso_tx_countdata = 	tximport(files=countdatafiles,
 	txOut=TRUE,
 	ignoreTxVersion=TRUE,
 	tx2gene=tx2genetbl,
 	type='salmon',
-	countsFromAbundance='scaledTPM',
-	importer=filereadfunc)
+	countsFromAbundance='scaledTPM'
+)
 
 stopifnot(iso_tx_countdata$abundance%>%rownames%>%setequal(trs))
 
-tx_countdata%>%saveRDS('data/tx_countdata.rds')
-iso_tx_countdata%>%saveRDS('data/iso_tx_countdata.rds')
+dir.create(here('data'))
+tx_countdata%>%saveRDS(here('data/tx_countdata.rds'))
+iso_tx_countdata%>%saveRDS(here('data/iso_tx_countdata.rds'))

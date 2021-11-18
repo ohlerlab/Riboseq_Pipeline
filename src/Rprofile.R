@@ -101,3 +101,15 @@ make_quantcompplot <- function(compdf, col1, col2, fname){
 }
 
 
+is_offchr<-function(gr,si){
+  if(is(gr,'GenomicRangesList')){
+   (end(gr) > split(seqlengths(gr)[as.character(unlist(seqnames(gr)))],gr@partitioning) ) %in% TRUE
+  }else{
+    seqinfo(gr)<-si
+    end(gr) > seqlengths(gr)[as.character(seqnames(gr))]
+  }
+}
+is_out_of_bounds <- function(gr,si = seqinfo(gr)){
+  start(gr)<1 | is_offchr(gr,si) 
+}
+
