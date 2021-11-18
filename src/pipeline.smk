@@ -925,30 +925,33 @@ rule ribostan:
 rule read_countdata:
   input:
     salmon = expand('salmon/data/{sample}/quant.sf', sample=ribosamples),
-    ribostan = expand('ribostan/{sample}/{sample}.ribostan.tsv', sample=rnasamples)
+    ribostan = expand('ribostan/{sample}/{sample}.ribostan.tsv', sample=rnasamples),
+    GTF=GTF,
+    REF=REF
   threads:4
   output: 
     'r_data/tx_countdata.rds',
     'r_data/iso_tx_countdata.rds',
     'r_data/gtf_gr.rds'
   shell: r"""
-    Rscript ../src/read_countdata.R 
+    Rscript ../src/read_countdata.R --gtf={input.GTF} --fafile={input.REF}
   """
 
-# rule run_deseq:
-#   input:
-#     ribobam = 'star/ORFext/data/{sample}/{sample}.bam',
-#     ribofasta = ORFEXT_FASTA
-#   threads:4
-#   # conda: '../envs/ribostan'
-#   output: efile = 'ribostan/{sample}/{sample}.ribostan.tsv'
-#   shell: r"""
-#   Rscript ../src/run_deseq.R 
-#   """
+rule run_deseq:
+  threads:4
+  input:  
+    'r_data/tx_countdata.rds',
+    'r_data/iso_tx_countdata.rds',
+    'r_data/gtf_gr.rds'
+  output:
+    'r_data/dds.rds'
+  shell: r"""
+  Rscript ../src/run_deseq.R 
+  """
 
 rule deseq_report:
   input:
-   'r_data/tx_countdata.rds','r_data/dds.rds','r_data/'
+   'r_data/tx_countdata.rds','r_data/dds.rds'
   threads:4
   output: report = 'deseq_report/ribo_de_report.html'
   shell: r"""

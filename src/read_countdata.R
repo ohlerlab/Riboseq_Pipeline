@@ -106,3 +106,4 @@ stopifnot(iso_tx_countdata$abundance%>%rownames%>%setequal(trs))
 
 tx_countdata%>%saveRDS('r_data/tx_countdata.rds')
 iso_tx_countdata%>%saveRDS('r_data/iso_tx_countdata.rds')
+iso_tx_countdata%>%saveRDS('r_data/gtf_gr.rds')

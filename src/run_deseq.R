@@ -5,8 +5,8 @@ library(assertthat)
 source(here::here('src/Rprofile.R'))
 source(here::here('src/functions.R'))
 
-if(!exists('gtf_gr')) gtf_gr<- readRDS(here("data/gtf_gr.rds"))
-if(!exists('tx_countdata')) tx_countdata<- readRDS(here("data/tx_countdata.rds"))
+if(!exists('gtf_gr')) gtf_gr<- readRDS(here("pipeline/r_data/gtf_gr.rds"))
+if(!exists('tx_countdata')) tx_countdata<- readRDS(here("pipeline/r_data/tx_countdata.rds"))
 
 #table with gene 2 gname transformation
 gid2gname = gtf_gr%>%mcols%>%
@@ -14,7 +14,7 @@ gid2gname = gtf_gr%>%mcols%>%
   distinct(gene_id,gene_name)%>%
   select(gene_id,gene_name)
 #read in the sample_parameter file from the piepline
-sampdf = here('src/sample_parameter.csv')%>%
+sampdf = here('config/sample_parameter.csv')%>%
   read_csv%>%
   select(-one_of(dropcols))
 stopifnot(colnames(tx_countdata$counts)%in%sampdf$sample_id)
@@ -37,8 +37,8 @@ for(i in 1:ncol(sampdf)){
 
 
 #read the counts data - this takes a while sometimes
-# file.remove(here('data/dds.rds'))
-if(!file.exists(here('data/dds.rds'))){
+# file.remove(here('pipeline/r_data/dds.rds'))
+if(!file.exists(here('pipeline/r_data/dds.rds'))){
   #fractional counts sometimes result from e.g. ribomap - fix this
   randomround = function(x)floor(x)+rbinom(length(x),1,x%%1)
   fractionalcounts <- (tx_countdata$counts%%1==0)%>%any
@@ -62,9 +62,9 @@ if(!file.exists(here('data/dds.rds'))){
   #save deseq object 
   rownames(dds) <- rowData(dds)$gene_id
   rownames(colData(dds)) <- colData(dds)$sample_id
-  saveRDS(dds,here('data/dds.rds'))
+  saveRDS(dds,here('pipeline/r_data/dds.rds'))
 }else{
-  dds <-readRDS(here('data/dds.rds'))
+  dds <-readRDS(here('pipeline/r_data/dds.rds'))
 }
 cat('successfully loaded  countdata and annotation')
 stopifnot(exists('sampdf'))
@@ -72,16 +72,16 @@ stopifnot(exists('sampdf'))
 
 #you might want to use vst if there's a lot of data, for speed
 dir.create(here('data'))
-# file.remove('data/normcounts.rds')
-if(!file.exists(here('data/normcounts.rds'))){
+# file.remove('pipeline/r_data/normcounts.rds')
+if(!file.exists(here('pipeline/r_data/normcounts.rds'))){
   
   normfunc <- if(ncol(dds)>20) DESeq2::vst else DESeq2::rlog
   
   normcounts <- normfunc(dds)
   rownames(normcounts) <- rownames(dds)
-  saveRDS(normcounts,here('data/normcounts.rds'))
+  saveRDS(normcounts,here('pipeline/r_data/normcounts.rds'))
 }else{
-  normcounts<-readRDS(here('data/normcounts.rds'))
+  normcounts<-readRDS(here('pipeline/r_data/normcounts.rds'))
 }
 cat('successfully normalized  countdata')
 
@@ -134,8 +134,8 @@ cat('tested contrasts')
 
  #you might want to use vst if there's a lot of data, for speed
 dir.create(here('data'))
-# file.remove('data/resultslist.rds')
-if(!file.exists(here('data/resultslist.rds'))){
+# file.remove('pipeline/r_data/resultslist.rds')
+if(!file.exists(here('pipeline/r_data/resultslist.rds'))){
   design(dds) <- design
  
   dds <- DESeq(dds,betaPrior = F)
@@ -143,13 +143,13 @@ if(!file.exists(here('data/resultslist.rds'))){
   resultslist <- lapply(contrasts,results,object = dds)
   names(resultslist) <- names(contrasts)
   for(i in seq_along(resultslist))resultslist[[i]]$gene_id = rowData(dds)$gene_id
-  saveRDS(resultslist,here('data/resultslist.rds'))
+  saveRDS(resultslist,here('pipeline/r_data/resultslist.rds'))
 
   ddstodf<- function(ddsdf)results(ddsLRT)%>%as.data.frame%>%rownames_to_column('gene_id')
   ddsLRT = DESeq(dds, test="LRT", full=design(dds),reduced = ~ assay)
   changegenes <- results(ddsLRT)%>%ddstodf %>%subset%>%filter(padj < 0.05)%>%.$gene_id
   
-  saveRDS(changegenes,here('data/changegenes.rds'))
+  saveRDS(changegenes,here('pipeline/r_data/changegenes.rds'))
   
   if(do_xtail){
     run_xtail = function()Sys.glob(here('pipeline','xtail/*'))%>%setNames(.,basename(.)%>%str_extract(regex('(?<=xtail_).*(?=\\.tsv)')))
@@ -172,8 +172,8 @@ if(!file.exists(here('data/resultslist.rds'))){
   
   
 }else{
-  resultslist<-readRDS(here('data/resultslist.rds'))
-  changegenes<-readRDS(here('data/changegenes.rds'))
+  resultslist<-readRDS(here('pipeline/r_data/resultslist.rds'))
+  changegenes<-readRDS(here('pipeline/r_data/changegenes.rds'))
 }
 
 cat('successfully calculated contrasts:')

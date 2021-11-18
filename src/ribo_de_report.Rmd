@@ -23,6 +23,7 @@ dir.create(here('R_cache'),showWarnings=F)
 base::source(here('src/Rprofile.R'))
 
 
+
 #' Plot Heatmap
 #'
 #' Input matrix will be normalized (scaled and centered) by row. Then, values
@@ -248,7 +249,7 @@ message(normalizePath(plotfile))
   #(pca+geom_text(aes(group),size=I(2),alpha=I(0.5))) %>% {.$layers=.$layers[-1];.+geom_point(size=I(0))} +
 #  ggtitle('PCA : labelled by samplename')
 #we also want a table with these data to pick out outliers
-pca$data %>% write_tsv(here('data/pca.tsv'))
+pca$data %>% write_tsv(here('pipeline/r_data/pca.tsv'))
 
 cat("## pca_grouplabel, fig_width=12,fig_height=12")
 (pca+geom_text(aes(label=group),size=I(2),alpha=I(0.5)))%>%{.$layers=.$layers[-1];.+geom_point(size=I(0))}+ggtitle('PCA : labelled by group')
@@ -342,8 +343,8 @@ regdirfuncs = list(Up=identity,Down=function(x)x * -1)
 fc_df <- resultslist[["MT_vs_MB"]]
 regdirfunc=regdirfuncs[["Up"]]
 ont='BP'
-# file.remove(here('data/contrgotables.rds'))
-if(!file.exists(here('data/contrgotables.rds'))){
+# file.remove(here('pipeline/r_data/contrgotables.rds'))
+if(!file.exists(here('pipeline/r_data/contrgotables.rds'))){
   contrgotables<-mclapply(mc.cores=4,resultslist,function(fc_df){
     map_df(.id='regdir',regdirfuncs,function(regdirfunc){
       map_df(.id='ontology',c('BP','MF','CC')%>%setNames(.,.),function(ont){
@@ -354,9 +355,9 @@ if(!file.exists(here('data/contrgotables.rds'))){
       })
     })
   })%>%bind_rows(.id='contrast')
-  saveRDS(contrgotables,here('data/contrgotables.rds'))
+  saveRDS(contrgotables,here('pipeline/r_data/contrgotables.rds'))
 }else{
-  contrgotables<-readRDS(here('data/contrgotables.rds'))
+  contrgotables<-readRDS(here('pipeline/r_data/contrgotables.rds'))
 }
 
 ```
