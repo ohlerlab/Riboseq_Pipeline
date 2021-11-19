@@ -1,39 +1,42 @@
-source('src/Rprofile.R')
+source(here('src/Rprofile.R'))
 #okay so, lets get the overlapping portion of each cluster 
-ovclustdf = 'ext_data/processed_data_parclip_overlapping_clusters.txt'%>%
+ovclustdf = here('ext_data/processed_data_parclip_overlapping_clusters.txt')%>%
 	read_tsv
 #get overlapping region
 ovclustdf=ovclustdf%>%mutate_at(vars(matches('start|end')),list(as.numeric))%>%
 	mutate(ovstart = pmax(start1,start2),ovend=pmin(stop1,stop2))
 ovclustgr = GRanges(ovclustdf$chr1,IRanges(ovclustdf$ovstart,ovclustdf$ovend),ovclustdf$strand)
 ovclustgr = keepStandardChromosomes(ovclustgr,pruning='coarse')
-ovclustgrtr = ovclustgr%>%mapToTranscripts(exonsgrl)
 library(liftOver)
 #system('wget https://hgdownload.cse.ucsc.edu/goldenpath/hg19/liftOver/hg19ToHg38.over.chain.gz')
 #system('guzip hg19ToHg38.over.chain.gz')
 chainpath = here('hg19ToHg38.over.chain')
 ch = import.chain(chainpath)
 # seqlevelsStyle(cur) = "UCSC"  # necessary
-lovclustgr = liftOver(ovclustgr, ch)
-lovclustgr%<>%unlist
+# lovclustgr = liftOver(ovclustgr, ch)
+# lovclustgr%<>%unlist
+lovclustgr = ovclustgr
 #indeed these look right
 lovclustgr$name <- paste0('ovcluster_',seq_along(lovclustgr))
 lovclustgr%>%rtracklayer::export('test38.bed')
-
+#
 covtrs = names(fpcovlist[[1]][[1]])
-
+#
 tx2genemap<- gtf_gr%>%mcols%>%as.data.frame%>%distinct(transcript_id,gene_id)
-
-membgids = read_tsv('ext_data/dermott_membrane_localized.txt')%>%filter(localization_cat=='membrane')%>%.$gene_id
+#
+membgids = read_tsv(here('ext_data/dermott_membrane_localized.txt'))%>%filter(localization_cat=='membrane')%>%.$gene_id
 membtrs <- gtf_gr%>%subset(trimids(gene_id)%in%trimids(membgids))%>%mcols%>%as.data.frame%>%distinct(transcript_id,gene_id)%>%
 	filter(transcript_id%in%covtrs)%>%.$transcript_id
 exonsgrl = keepStandardChromosomes(exonsgrl,pruning='coarse')
-cdsgrl=gtf_gr%>%subset(type=='exon')%>%split(.,.$transcript_id)%>%sort_grl_st
+cdsgrl=gtf_gr%>%subset(type=='CDS')%>%split(.,.$transcript_id)%>%sort_grl_st
 metasitewindows = lovclustgr%>%resize(1,'center')%>%
-	mapToTranscripts(cdsgrl[membtrs])%>%
+	mapToTranscripts(exonsgrl[membtrs])%>%
 	{strand(.)<-'+';.}%>%
 	resize(101,'center')%>%
 	{.=.[!is_out_of_bounds(.)]}
+	metasitewindows
+
+
 #only count once per gene
 metasitewindows$gene_id = tx2genemap$gene_id[as.vector(match(seqnames(metasitewindows),tx2genemap$transcript_id))]
 metasitewindows <- metasitewindows[match(unique(metasitewindows$xHits),metasitewindows$xHits)]
@@ -55,7 +58,7 @@ i_sample=samples[1]
 meta_site_profiles <- mclapply(mc.cores=8,samples,function(i_sample){
 	fpcomb = fpcovlist[[i_sample]][c('28','29','30','31')]%>%Reduce(f='+')
 	fpcomb = fpcomb%>%as("GRanges")%>%width1grs%>%subset(score!=0)%>%
-		shift(12)%>%{.=.[!is_out_of_bounds(.)]}%>%coverage(weight='score')
+		{.=.[!is_out_of_bounds(.)]}%>%coverage(weight='score')
 	fpsums = fpcomb%>%sum
 	fpdens = fpsums/(sum(width(cdsgrl))[names(fpsums)])
 	library(txtplot)
@@ -80,6 +83,7 @@ meta_site_profiles%>%map_df(.id='sample',enframe)%>%
 		theme_bw()
 dev.off()
 message(normalizePath(plotfile))
+
 
 
 # mutate(pos = name )
@@ -119,6 +123,92 @@ print((pca+geom_text(aes(label=name),size=I(2),alpha=I(0.5)))%>%{.$layers=.$laye
 dev.off()
 message(normalizePath(plotfile))
 print((pca+geom_text(aes(label=name),size=I(2),alpha=I(0.5)))%>%{.$layers=.$layers[-1];.+geom_point(size=I(0))}+ggtitle('PCA : labelled by group'))
+
+
+################################################################################
+########## Same analysis but for the srp and tm domains
+################################################################################
+splocs = read_tsv(here("ext_data/sp_list.txt"))
+splocs$transcript_id = splocs$Transcript.stable.ID.version
+splocs=splocs[splocs$transcript_id%in% names(fpcovlist[[1]][[1]]),]
+metasrpwindows = GRanges(splocs$transcript_id,IRanges(1,60))
+metasrpwindows %<>% shift(cdsstarts[as.character(seqnames(metasrpwindows))]-1)
+#only count once per gene
+metasrpwindows$gene_id = tx2genemap$gene_id[as.vector(match(seqnames(metasrpwindows),tx2genemap$transcript_id))]
+# metasrpwindows <- metasrpwindows[match(unique(metasrpwindows$xHits),metasrpwindows$xHits)]
+samples = names(fpcovlist)
+i_sample=samples[1]
+meta_srp_profiles <- mclapply(mc.cores=8,samples,function(i_sample){
+	fpcomb = fpcovlist[[i_sample]][c('28','29','30','31')]%>%Reduce(f='+')
+	fpcomb = fpcomb%>%as("GRanges")%>%width1grs%>%subset(score!=0)%>%
+		{.=.[!is_out_of_bounds(.)]}%>%coverage(weight='score')
+	fpsums = fpcomb%>%sum
+	fpdens = fpsums/(sum(width(cdsgrl))[names(fpsums)])
+	metasrpwindows2use = metasrpwindows%>%subset(seqnames%in%covtrs)
+	fppossums = fpcomb[metasrpwindows]%>%as.matrix%>%colSums
+	fpposexpts = sum(fpdens[as.vector(seqnames(metasrpwindows))])
+	# txtplot(fppossums/fpposexpts)
+	cat('.')
+	fppossums/fpposexpts
+})
+stopifnot(!is.error(meta_srp_profiles[[1]]))
+meta_srp_profiles%<>%setNames(samples)
+
+plotfile <- here(paste0('plots/','meta_sp_ribo','.pdf'))
+pdf(plotfile)
+meta_srp_profiles%>%map_df(.id='sample',enframe)%>%
+		separate(sample,c('fraction','genotype','rep'),remove=FALSE)%>%
+		ggplot(aes(x=name,y=value,color=genotype,group=sample))+
+		geom_line()+
+		scale_x_continuous('P site position relative to start',breaks=seq(0,59,by=3))+
+		scale_y_continuous('P site Enrichment')+
+		facet_grid(fraction~.)+
+		theme_bw()
+dev.off()
+message(normalizePath(plotfile))
+
+
+tmlocs = read_tsv(here("ext_data/tm_list.txt"))
+tmlocs$transcript_id = tmlocs$Transcript.stable.ID.version
+tmlocs=tmlocs[tmlocs$transcript_id%in% names(fpcovlist[[1]][[1]]),]
+metatmwindows = GRanges(tmlocs$transcript_id,IRanges(1,120))
+metatmwindows %<>% shift(cdsstarts[as.character(seqnames(metatmwindows))]-1)
+#only count once per gene
+metatmwindows$gene_id = tx2genemap$gene_id[as.vector(match(seqnames(metatmwindows),tx2genemap$transcript_id))]
+# metatmwindows <- metatmwindows[match(unique(metatmwindows$xHits),metatmwindows$xHits)]
+samples = names(fpcovlist)
+i_sample=samples[1]
+meta_tm_profiles <- mclapply(mc.cores=8,samples,function(i_sample){
+	fpcomb = fpcovlist[[i_sample]][c('28','29','30','31')]%>%Reduce(f='+')
+	fpcomb = fpcomb%>%as("GRanges")%>%width1grs%>%subset(score!=0)%>%
+		{.=.[!is_out_of_bounds(.)]}%>%coverage(weight='score')
+	fpsums = fpcomb%>%sum
+	fpdens = fpsums/(sum(width(cdsgrl))[names(fpsums)])
+	metatmwindows2use = metatmwindows%>%subset(seqnames%in%covtrs)
+	fppossums = fpcomb[metatmwindows]%>%as.matrix%>%colSums
+	fpposexpts = sum(fpdens[as.vector(seqnames(metatmwindows))])
+	cat('.')
+	fppossums/fpposexpts
+})
+stopifnot(!is.error(meta_tm_profiles[[1]]))
+meta_tm_profiles%<>%setNames(samples)
+plotfile <- here(paste0('plots/','meta_tm_ribo','.pdf'))
+pdf(plotfile)
+meta_tm_profiles%>%map_df(.id='sample',enframe)%>%
+		separate(sample,c('fraction','genotype','rep'),remove=FALSE)%>%
+		ggplot(aes(x=name,y=value,color=genotype,group=sample))+
+		geom_line()+
+		scale_x_continuous('P site position relative to start')+
+		scale_y_continuous('P site Enrichment')+
+		facet_grid(fraction~.)+
+		theme_bw()
+dev.off()
+message(normalizePath(plotfile))
+
+
+
+trspacecds%>%
+
 
 
 

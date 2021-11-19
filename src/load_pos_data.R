@@ -18,13 +18,14 @@ library(tidyverse)
 select <- dplyr::select
 slice <- dplyr::slice
 #
-fafile <- here(paste0('pipeline/',basename(yaml::yaml.load_file(here('src/config.yaml'))$REF)))
+fafile <- here(paste0('pipeline/',basename(yaml::yaml.load_file(here('config/config.yaml'))$REF)))
+fafile%<>%str_replace('.gz$','')
 fafileob <- FaFile(fafile)
 
-gtf <- here(paste0('pipeline/',basename(yaml::yaml.load_file(here('src/config.yaml'))$GTF)))
+gtf <- here(paste0('pipeline/',basename(yaml::yaml.load_file(here('config/config.yaml'))$GTF)))
 if(!exists('gtf_gr')) gtf_gr <- rtracklayer::import(gtf)
 
-source('src/functions.R')
+source(here('src/functions.R'))
 #
 roundup <- function(x,n) n*ceiling(x/n)
 rounddown <- function(x,n) n*floor(x/n)
@@ -66,6 +67,11 @@ gn2tr = mcols(gtf_gr)%>%as.data.frame%>%
 	distinct(transcript_id,gene_id)
 cdsgrl = gtf_gr%>%subset(type=='CDS')%>%split(.,.$transcript_id)%>%sort_grl_st
 gn2tr = gn2tr%>%left_join(cdsgrl%>%width%>%sum%>%enframe('transcript_id','length'))
+splocs = read_tsv(here("ext_data/sp_list.txt"))
+splocs$transcript_id = splocs$Transcript.stable.ID.version
+tmlocs = read_tsv(here("ext_data/tm_list.txt"))
+tmlocs$transcript_id = tmlocs$Transcript.stable.ID.version
+
 #
 if(!file.exists(here('data/longesttrs.rds'))){
 
@@ -80,8 +86,13 @@ if(!file.exists(here('data/longesttrs.rds'))){
 	# 	group_by(gene_id)%>%
 	# 	filter(gene_id %in% highcountgenes)%>%
 	# 	slice(which.max(value))%>%.$transcript_id
-
-	longesttrs = gn2tr%>%group_by(gene_id)%>%slice(which.max(length))%>%.$transcript_id
+	longesttrs = gn2tr%>%group_by(gene_id)%>%
+		mutate(hastm = transcript_id%in%tmlocs$transcript_id)%>%
+		mutate(hassp = transcript_id%in%splocs$transcript_id)%>%
+		arrange(-hastm, -hassp, -length)%>%
+		slice(1)%>%
+		filter(!is.na(length))%>%
+		.$transcript_id
 	saveRDS(longesttrs,here('data/longesttrs.rds'))
 }else{
 	longesttrs<-readRDS(here('data/longesttrs.rds'))
@@ -96,7 +107,7 @@ cdsseq <- cds2use%>%{GenomicFeatures::extractTranscriptSeqs(.,x=fafileob)}
 allcodons=getGeneticCode()
 
 #get genes with reasonably high counts
-counts <- readRDS('data/tx_countdata.rds')
+counts <- readRDS(here('data/tx_countdata.rds'))
 counts<-counts$counts%>%
 	as.data.frame%>%
 	rownames_to_column('gene_id')%>%
@@ -124,10 +135,17 @@ trcds = GRanges(names(cdsstarts),IRanges(cdsstarts,cdsends))
 # tx_countdata$counts%>%colSums%>%divide_by(1e6)
 #riboslevels <- seqlevels(ribogr)
 
-ribobams <- Sys.glob('pipeline/star/data/*/*.bam')%>%str_subset(neg=T,'rnaseq')
+ribobams <- Sys.glob(here('pipeline/star/data/*/*.bam'))%>%str_subset(neg=T,'rnaseq')
 trimids <- .%>% str_replace('\\.\\d+$','')
 # ribobams <- ribobams%>%str_subset('4E')
 names(ribobams) <- ribobams%>%basename%>%str_replace('_\\d+.bam','')%>%str_replace('rep','')%>%str_replace('riboseq','ribo')%>%str_replace('\\+','pos')%>%str_replace('\\-','neg')
+
+#filter for only long enough ones, if we're doing windows
+trspacecds = pmapToTranscripts(cdsgrl[highcountcovtrs],exonsgrl[highcountcovtrs])
+trspacecds%<>%unlist
+ltrspacecds = trspacecds
+longcdstrs = names(ltrspacecds)[ltrspacecds%>%width%>%`>`(MINCDSSIZE)]
+ltrspacecds = ltrspacecds[longcdstrs]
 
 ribobam <-ribobams[1]
 if(!file.exists(here('data/fpcovlist.rds'))){
@@ -138,11 +156,15 @@ if(!file.exists(here('data/fpcovlist.rds'))){
 		cov = ribogr%>%resize(1)%>%mapToTranscripts(exonsgrl[highcountcovtrs])
 		cov$readlen = mcols(ribogr)$readlen[cov$xHits]
 		cov%<>%subset(between(readlen,25,35))
-		cov%<>%resize(1,'start')
-		cdscov <- cov%>%mapToTranscripts(trspacecds[highcountcovtrs])
-		cdscov$readlen <- cov$readlen[cdscov$xHits]
-		cdscov$xHits <- NULL
-		cdscov$transcriptsHits<-NULL
+		message('warning shifting fps')
+		strand(cov)='+'
+		cov%<>%resize(1,'start')%>%GenomicRanges::shift(12)
+		# cdscov <- cov%>%mapToTranscripts(trspacecds[highcountcovtrs])
+		# c
+		# cdscov$readlen <- cov$readlen[cdscov$xHits]
+		# cdscov$xHits <- NULL
+		# cdscov$transcriptsHits<-NULL
+		cdscov <- cov	
 		split(cdscov,cdscov$readlen)%>%
 			lapply(coverage)
 	})
@@ -150,17 +172,11 @@ if(!file.exists(here('data/fpcovlist.rds'))){
 	saveRDS(fpcovlist,here('data/fpcovlist.rds'))
 }else{
 	fpcovlist<-readRDS(here('data/fpcovlist.rds'))
-	# stopifnot(names(fpcovlist)==names(allbamtbls))
-	# stopifnot(all(longesttrs%in%names(fpcovlist[[1]][['29']])))
-	# inclusiontable(longesttrs,names(fpcovlist[[1]][['29']]))
 }
 
-#filter for only long enough ones, if we're doing windows
-trspacecds = pmapToTranscripts(cdsgrl[highcountcovtrs],exonsgrl[highcountcovtrs])
-trspacecds%<>%unlist
-ltrspacecds = trspacecds
-longcdstrs = names(ltrspacecds)[ltrspacecds%>%width%>%`>`(MINCDSSIZE)]
-ltrspacecds = ltrspacecds[longcdstrs]
+sum(runLength(fpcovlist[[1]][[1]]))[ttrs]==seqlengths(metasrpwindows)[ttrs]
+sum(runLength(fpcovlist[[1]][[1]]))[ttrs]==sum(width(cdsgrl))[ttrs]
+sum(runLength(fpcovlist[[1]][[1]]))[ttrs]==sum(width(exonsgrl))[ttrs]
 
 # #see how many we eliminate for length reasons
 # message(length(ltrspacecds))

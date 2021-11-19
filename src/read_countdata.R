@@ -4,12 +4,12 @@ source(here::here('src/Rprofile.R'))
 source(here::here('src/functions.R'))
 
 
-gtf <- here(paste0('pipeline/',basename(yaml::yaml.load_file(here('src/config.yaml'))$GTF_orig)))
+gtf <- here(paste0('pipeline/',basename(yaml::yaml.load_file(here('config/config.yaml'))$GTF_orig)))
 stopifnot(file.exists(gtf))
 if(!exists('gtf_gr')) gtf_gr <- rtracklayer::import(gtf)
 
 
-sampleinfo <- read_csv(here('src/sample_parameter.csv'))
+sampleinfo <- read_csv(here('config/sample_parameter.csv'))
 ribosamples <- sampleinfo%>%filter(isriboseq)%>%.$sample_id
 rnasamples <- sampleinfo%>%filter(!isriboseq)%>%.$sample_id
 salmonfiles <- ''[0]

@@ -4,7 +4,7 @@ PROJECTFOLDER: "/fast/AG_Ohler/dharnet/SRP_Riboseq"
 #the genome
 REF_orig: "../ext_data/GRCh37.p13.genome.fa.gz"
 #annotation as gtf file - you can get these form the 
-GTF_orig: "../ext_data/gencode.v19.annotation.gtf.gz"
+GTF_orig: "../ext_data/gencode.v19.annotation.gtf"
 #
 PCFASTA: "../ext_data/gencode.v19.pc_transcripts.fa"
 #a file of contaminants (tRNA, rRNA etc for your organism)
