@@ -10,6 +10,8 @@
 
 
 source ~/.bashrc
-conda activate ribopipebase
 mkdir -p sge_log
-snakemake -j 10 -k -p --restart-times 1 --max-jobs-per-second 5 -s Snakefile --cluster-config ../src/config_pipeline.json  --rerun-incomplete --use-conda --cluster="qsub -cwd -V -l m_mem_free={cluster.m_mem_free} -l h_rt={cluster.h_rt} -pe {cluster.pe} -j yes -o sge_log" "all"
+snakemake -j 10 -k -p --restart-times 1 --max-jobs-per-second 5 -s Snakefile \
+	 --cluster-config ../src/config_pipeline.json  --rerun-incomplete \
+	 --use-singularity --singularity-args "-B /fast/AG_Ohler/:/fast/AG_Ohler"  \
+	 --cluster="qsub -cwd -V -l m_mem_free={cluster.m_mem_free} -l h_rt={cluster.h_rt} -pe {cluster.pe} -j yes -o sge_log" "all"
