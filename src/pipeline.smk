@@ -142,7 +142,7 @@ QUALLIM=config['QUALLIM']
 
 
 ## copy_ref: create a plain text copy of the reference genome file in
-## case it is in a compressed format and use samtools to generate its
+## case it is in a compressed format and use SAMtools to generate its
 ## index. These will be used later for mapping with STAR.
 
 rule copy_ref:
@@ -218,7 +218,7 @@ rule link_in_files:
 ## specified as ADAPTERSEQ in config.yaml from all reads. Resulting
 ## trimmed reads that are shorter than MINREADLENGTH or longer than
 ## MAXREADLENGTH are discarded. Furthermore, bases on the 3' end with
-## quality scores lower than QUALLIM are trimmed.
+## quality scores lower than QUALLIM are trimmed off.
 
 ADAPTERSEQ=config['ADAPTERSEQ']
 
@@ -269,8 +269,8 @@ rule collapse_reads:
      """
 
 
-## trim_reads: trim off the 8 nucleotides of the UMI sequences from
-## reads (if you are using UMIs).
+## trim_reads: trim off UMI sequences from reads after collapsing
+## duplicates (if you are using UMIs).
 
 rule trim_reads:
     input: 'collapse_reads/{sample}/{fastq}'
@@ -340,7 +340,7 @@ rule make_trna_rrna_indices:
 
 
 ## filter_tRNA_rRNA: use STAR to map reads to contaminant sequences.
-## Use samtools to discard reads that successfully mapped to
+## Use SAMtools to discard reads that successfully mapped to
 ## contaminant sequences.
 
 rule filter_tRNA_rRNA: 
@@ -430,7 +430,11 @@ rule link_processed_reads:
 ################################################################################
 ########Annotation
 ################################################################################
-  
+
+
+## makeGTF: create a plain text GTF file copy of the annotation file
+## even if it is in a compressed format.
+
 rule makeGTF:
   input: GTF=GTF_orig
   output: GTF
@@ -444,6 +448,10 @@ rule makeGTF:
       | gffread -F -T -o {GTF}
 
     """
+
+
+## make_utrs: extract all features marked as 5'UTRs or 3'UTRs from the
+## annotation files and produce separate GTF files for those.
  
 rule make_utrs:
   input: GTF=GTF_orig
@@ -462,15 +470,18 @@ rule make_utrs:
       | awk -v OFS="\t"  '{{if($3=="three_prime_UTR"){{         ;print $0}}}}' \
       | sed -r  's/((transcript_id|gene_id|protein_id|ID=\w+|Parent)\W+\w+)\.[0-9]+/\1/g' \
       > {output.tputrs}
-
-     
       """) 
 
 
 ################################################################################
 ########Fastqc
 ################################################################################
-  
+
+
+## fastqc: run processed reads (reads that have been adapater-trimmed,
+## duplicate-collapsed and UMI-trimmed, and contaminant-filtered)
+## through FastQC.
+
 def get_sample_fastqs(wc,mate='1',folder='processed_reads',seqfilesdf=seqfilesdf):
    #correct zcat strings based on read pairs
   filedf = (seqfilesdf.loc[[wc['sample']]])
@@ -484,7 +495,6 @@ def get_sample_fastqs(wc,mate='1',folder='processed_reads',seqfilesdf=seqfilesdf
   return matefiles
 
 get_sample_fastqs2 = partial(get_sample_fastqs,mate='2')
-
 
 rule fastqc:
      input:
@@ -500,6 +510,10 @@ rule fastqc:
           mkdir -p {params.outdir}
           wait $(for i in {input.lfastqs} {input.rfastqs}; do $( fastqc -o {params.outdir} $i ) & done) 
         '''
+
+
+## collect_fastqc: summarize FastQC results of all samples in a single
+## tab-separated file.
 
 rule collect_fastqc:
      input:
@@ -521,6 +535,10 @@ rule collect_fastqc:
 ########STAR
 ################################################################################
 
+
+## star_index: use STAR to index the reference genome and annotation, a
+## necessary step before mapping with STAR.
+
 rule star_index:
  input: REF=ancient(REF),GTF=ancient(GTF)
  output: touch('starindex/starindex.done')
@@ -534,6 +552,12 @@ rule star_index:
      --sjdbGTFfile {input.GTF} \
      --genomeFastaFiles {input.REF}
    """
+
+
+## star: use STAR to map processed reads (reads that have been
+## adapater-trimmed, duplicate-collapsed and UMI-trimmed, and
+## contaminant-filtered) to the indexed reference genome. Use SAMtools
+## to sort and index the resulting bam files.
 
 #mating paired end reads
 def get_file_string(wc,seqfilesdf=seqfilesdf):
@@ -635,10 +659,16 @@ rule star:
           """
 
 
-
 ################################################################################
 
-  
+
+## make_picard_files: generate a text file containing sequence
+## alignment map headers and coordinates of rRNA sequences to be used
+## by Picard. This is done by using SAMtools to extract headers from a
+## bam file produced by STAR and running grep to find rRNA genes on the
+## reference annotation GTF file. Additionally, use gtfToGenePred to
+## convert the GTF into a genePred table.
+
 rrna_intervals = 'qc/picard_rrna_intervals.txt'
 refflat = Path('qc') / Path(GTF).with_suffix('.refflat').name
 #refflat = snakedir/ 'qc' / Path(config['GFF_orig']).with_suffix('.refflat').name
@@ -662,6 +692,11 @@ rule make_picard_files:
         cat {input.GTF}.genepred | awk -vOFS="\t" '{{print $1,$0}}' > {output.refflat}
 
   """
+
+
+## qc: use Picard and custom scripts to generate quality control
+## reports and plots of mapped reads. Results are placed in the qc/
+## directory.
 
 rule qc:
      input:
@@ -717,6 +752,9 @@ rule qc:
 
           """
 
+
+## multiqc: use MultiQC to collate reports produced by the following
+## rules: fastqc, star, qc, and salmon into one nice html report.
 
 def get_multiqc_dirs(wildcards,input):
       reportsdirs = list(input)
