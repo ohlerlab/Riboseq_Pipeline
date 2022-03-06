@@ -1,5 +1,5 @@
 # Riboseq_Pipeline
-This is the Lab's standard Ribo-seq processing pipeline, a snakemake workflow and some R scripts, including ORFquant and RiboseQC.
+This is the lab's standard Ribo-seq processing pipeline, a snakemake workflow and some R scripts, including ORFquant and RiboseQC.
 
 - Make sure you have [Miniconda3](https://docs.conda.io/en/latest/miniconda.html) working on the server
 
