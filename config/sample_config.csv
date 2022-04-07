@@ -1,0 +1,13 @@
+sample_id,file,mate,pair_id,libtype,group,isriboseq
+Ebp1_riboseq_mock_1,/fast/AG_Ohler/Riboseq_Pipeline_Data/input/ML_UZ_026_barcode_Mock1.fastq.gz,,,SF,Ebp1_riboseq_mock,True
+Ebp1_riboseq_mock_2,/fast/AG_Ohler/Riboseq_Pipeline_Data/input/ML_UZ_026_barcode_Mock2.fastq.gz,,,SF,Ebp1_riboseq_mock,True
+Ebp1_riboseq_mock_3,/fast/AG_Ohler/Riboseq_Pipeline_Data/input/ML_UZ_026_barcode_Mock3.fastq.gz,,,SF,Ebp1_riboseq_mock,True
+Ebp1_riboseq_si_1,/fast/AG_Ohler/Riboseq_Pipeline_Data/input/ML_UZ_026_barcode_si1.fastq.gz,,,SF,Ebp1_riboseq_si,True
+Ebp1_riboseq_si_2,/fast/AG_Ohler/Riboseq_Pipeline_Data/input/ML_UZ_026_barcode_si2.fastq.gz,,,SF,Ebp1_riboseq_si,True
+Ebp1_riboseq_si_3,/fast/AG_Ohler/Riboseq_Pipeline_Data/input/ML_UZ_026_barcode_si3.fastq.gz,,,SF,Ebp1_riboseq_si,True
+Ebp1_rnaseq_mock_1,/fast/AG_Ohler/Riboseq_Pipeline_Data/input/ML_UZ_027_barcode_Mock_1.fastq.gz,,,SF,Ebp1_rnaseq_mock,False
+Ebp1_rnaseq_mock_2,/fast/AG_Ohler/Riboseq_Pipeline_Data/input/ML_UZ_027_barcode_Mock_2.fastq.gz,,,SF,Ebp1_rnaseq_mock,False
+Ebp1_rnaseq_mock_3,/fast/AG_Ohler/Riboseq_Pipeline_Data/input/ML_UZ_027_barcode_Mock_3.fastq.gz,,,SF,Ebp1_rnaseq_mock,False
+Ebp1_rnaseq_si_1,/fast/AG_Ohler/Riboseq_Pipeline_Data/input/ML_UZ_027_barcode_si_1.fastq.gz,,,SF,Ebp1_rnaseq_si,False
+Ebp1_rnaseq_si_2,/fast/AG_Ohler/Riboseq_Pipeline_Data/input/ML_UZ_027_barcode_si_2.fastq.gz,,,SF,Ebp1_rnaseq_si,False
+Ebp1_rnaseq_si_3,/fast/AG_Ohler/Riboseq_Pipeline_Data/input/ML_UZ_027_barcode_si_3.fastq.gz,,,SF,Ebp1_rnaseq_si,False
