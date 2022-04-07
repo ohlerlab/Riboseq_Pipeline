@@ -35,10 +35,10 @@ configfile: "../config/config.yaml"
 PROJECTFOLDER=config['PROJECTFOLDER']
 TMPDIR = Path('../tmp')
 
-seqfilesdf = pd.read_csv(config['sample_files'],dtype=str).set_index("sample_id", drop=False)
-sampledf = pd.read_csv(config['sample_parameter']).set_index("sample_id", drop=False)
+seqfilesdf = pd.read_csv(config['sample_config'],dtype=str).set_index("sample_id", drop=False)
+#sampledf = pd.read_csv(config['sample_parameter']).set_index("sample_id", drop=False) old code from seperated config files, delete if script runs ok
 
-assert sampledf.sample_id.is_unique
+assert seqfilesdf.sample_id.is_unique
 lacks_mate_info = (not 'mate' in seqfilesdf.columns) or (seqfilesdf.mate.isna().all())
 if lacks_mate_info: seqfilesdf['mate'] = '1'
 lacks_pair_id = (not 'pair_id' in seqfilesdf.columns) or (seqfilesdf.pair_id.isna().all())
@@ -49,8 +49,8 @@ lacks_file_id = not 'file_id' in seqfilesdf.columns or (seqfilesdf.file_id.isna(
 if lacks_file_id: seqfilesdf['file_id']=seqfilesdf.pair_id+'_R'+seqfilesdf.mate+'.fastq.gz'
 assert (~seqfilesdf.file_id.isna()).all()
 
-assert sampledf.sample_id.is_unique
-assert isinstance(seqfilesdf.iloc[0,1],str), "file column should be a string in read_files.csv"
+assert seqfilesdf.sample_id.is_unique
+assert isinstance(seqfilesdf.iloc[0,1],str), "file column should be a string in sample_config.csv"
 assert 'file_id' in seqfilesdf.columns
 assert not (pd.Series([Path(f).name for f in seqfilesdf.file_id]).duplicated().any()),"files need unique filenames"
 
@@ -77,21 +77,21 @@ for i in seqfilesdf.file: assert Path(i).stat().st_size > 100, "This file isn't 
 #seqfilesdf.to_csv(config['sample_files'])
 
 #make sure our ids and files look ok
-assert set(seqfilesdf.sample_id) == set(sampledf.sample_id), "Sample IDs need to be setequal in "+config['sample_files']+" and "+config['sample_parameter'] +": \n"+"seqfile ids " + seqfilesdf.sample_id[0:3] + "... \n" +"seqfile ids " + sampledf.sample_id[0:3] + "... "
+assert set(seqfilesdf.sample_id) == set(seqfilesdf.sample_id), "Sample IDs need to be setequal in "+config['sample_files']+" and "+config['sample_parameter'] +": \n"+"seqfile ids " + seqfilesdf.sample_id[0:3] + "... \n" +"seqfile ids " + seqfilesdf.sample_id[0:3] + "... "
 
-for sample in sampledf.sample_id:
+for sample in seqfilesdf.sample_id:
   for f in seqfilesdf.loc[[sample],'file']:
     fp = Path(f)
     assert fp.exists, f
     assert 'fastq.gz' in fp.name or 'fq.gz' in fp.name or 'fastq' in fp.name , f
 
 #define samples
-samples = list(sampledf['sample_id'].unique())
+samples = list(seqfilesdf['sample_id'].unique())
 fastqs = list(seqfilesdf['file'].unique())
 
-assert sampledf.isriboseq.isin([True,False]).all()
-ribosamples = sampledf.sample_id[sampledf.isriboseq]
-rnasamples = sampledf.sample_id[~sampledf.isriboseq]
+assert seqfilesdf.isriboseq.isin([True,False]).all()
+ribosamples = seqfilesdf.sample_id[seqfilesdf.isriboseq]
+rnasamples = seqfilesdf.sample_id[~seqfilesdf.isriboseq]
 
 #for trimming CDS for riboseq
 REF_orig=config['REF_orig']
@@ -123,7 +123,7 @@ if config['TRIM_IDS']:
 else:
   mod_id_sed_cmd = ' cat '
 
-assert sampledf.libtype.str.match('[IOM]?[SU][FR]?').all()
+assert seqfilesdf.libtype.str.match('[IOM]?[SU][FR]?').all()
 
 
 rule all:
@@ -409,7 +409,7 @@ rule filter_tRNA_rRNA:
 def choose_processed_reads(wc,config=config):
   #correct zcat strings based on read pairs
   filedf = (seqfilesdf.loc[[wc['sample']]])
-  isrna = ~sampledf.loc[wc['sample'],'isriboseq']
+  isrna = ~seqfilesdf.loc[wc['sample'],'isriboseq']
   filedf = filedf[filedf.file_id==wc.fileid]
   if isrna:
     return [config['FILT_RNA_FOLDER']+'/'+wc['sample']+'/'+f for f in filedf.file_id]
@@ -487,7 +487,7 @@ def get_sample_fastqs(wc,mate='1',folder='processed_reads',seqfilesdf=seqfilesdf
    #correct zcat strings based on read pairs
   filedf = (seqfilesdf.loc[[wc['sample']]])
   filedf = filedf.loc[filedf.mate==mate,]
-  isrna = ~sampledf.loc[wc['sample'],'isriboseq']
+  isrna = ~seqfilesdf.loc[wc['sample'],'isriboseq']
   assert isrna.all() | (~isrna).all()
   isrna = isrna.all()
   folder =  config['FILT_RNA_FOLDER']if isrna else config['FILT_RIBO_FOLDER']
@@ -589,14 +589,14 @@ rule star:
         #filestring = lambda wc: get_file_string(wc,seqfilesdf),
         GEN_DIR=lambda wc,input: input.STARINDEX.replace('starindex.done',''),
         #only used for remap (now remap='')
-        markdup = lambda wc: '' if sampledf.isriboseq[wc['sample']] else '-m',
+        markdup = lambda wc: '' if seqfilesdf.isriboseq[wc['sample']] else '-m',
         platform = 'NotSpecified',
         outputdir = lambda wc,output: os.path.dirname(output[0]),
         repdir = lambda wc,output: os.path.dirname(output[0]).replace('data','reports'),
         #tophatindex =lambda wc,input: input['bowtie_index'].replace('.done',''),
         halfthreads = lambda wc,threads: threads/2,
         sortmem = lambda wc,threads: str(int(5000/(threads/2)))+'M',
-        #remap = '1' if sampledf.isriboseq[wc['sample']] else ''
+        #remap = '1' if seqfilesdf.isriboseq[wc['sample']] else ''
         remap = '',
         lfilestring = lambda wc,input: '<(zcat '+' '.join(input.lfastqs)+')',
         rfilestring = lambda wc,input: '<(zcat '+' '.join(input.rfastqs)+')' if input.rfastqs   else '' ,
@@ -712,7 +712,7 @@ rule qc:
      # conda: '../envs/picard'
      resources:
      params:
-        singleendflag = lambda wc: ' -e ' if sampledf.libtype.str.match('^[SU]')[wc.sample]  else '',
+        singleendflag = lambda wc: ' -e ' if seqfilesdf.libtype.str.match('^[SU]')[wc.sample]  else '',
         scriptdir = lambda wc: config['rnaseqpipescriptdir']
      shell: """
           set -exv
@@ -923,7 +923,7 @@ rule salmon:
   params:
     # salmonindex = lambda wc,input: 'salmonindexribo' if wc['sample'] in ribosamples else input.salmonindex.replace('.done',''),
     salmonindex = 'salmonindex',
-    lib = lambda wc: sampledf.loc[wc['sample'],'libtype']
+    lib = lambda wc: seqfilesdf.loc[wc['sample'],'libtype']
   output:
       quant = touch('salmon/data/{sample}/quant.sf')
   threads: 4
