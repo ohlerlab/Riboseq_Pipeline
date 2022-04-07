@@ -12,8 +12,9 @@ MAXREADLENGTH: 100
 #quality liit for cutadapt
 QUALLIM: 20
 #
-sample_files: "../config/read_files.csv"
-sample_parameter: "../config/sample_parameter.csv"
+#sample_files: "../config/read_files.csv"
+#sample_parameter: "../config/sample_parameter.csv"
+sample_config: "..config/sample_config.csv"
 #option to replace multiqc with ones own command (you can ignore unless you want to tweak the reports yourself)
 multiqcscript: 'multiqc'
 #this has some scripts for QC etc.
