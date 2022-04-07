@@ -1,12 +1,12 @@
 # Ribo-Seq Pipeline
 
-This is the lab's standard Ribo-Seq processing pipeline. It consists of a [docker](7)ised [snakemake](6) workflow that ties together R scripts, as well as [ORFquant](3), [Ribostan](4) and [RiboseQC](5) and can be run in [Singularity](8).  
+This is the lab's standard Ribo-Seq processing pipeline. It consists of a [docker](https://docs.docker.com/get-started/overview/)ised [snakemake](https://snakemake.readthedocs.io/en/stable/) workflow that ties together R scripts, as well as [ORFquant](https://github.com/ohlerlab/ORFquant.git), [Ribostan](https://github.com/zslastman/Ribostan.git) and [RiboseQC](https://github.com/ohlerlab/RiboseQC.git) and can be run in [Singularity](https://sylabs.io/guides/2.6/user-guide/introduction.html).  
 
 ## Installation
 
 1. **Install Singularity:**  
 
-    [Link to guide.](1)   
+    [Link to guide.](https://sylabs.io/guides/3.0/user-guide/installation.html)   
     *Note: If you have conda installed, it might interfer with Singularity.  
     Add this to the end of your path, e.g. `.bashrc` on linux, to avoid this behavior:*
     ```
@@ -62,7 +62,18 @@ This is the lab's standard Ribo-Seq processing pipeline. It consists of a [docke
     Check whether your output files (sampledf or seqfilesdf) look right.  
     A common reason for errors are misspecified paths or misplaced symbols like **'. ,'**.   
 
+### Running the pipeline
+- After the initial configuration and dry run use:
+    ```
+    bash ../src/snake_job.sh
+    ```
+
+    *Note: This command can be run interactively with screen for color-coded feedback or with qsub.*
+
 ### Debugging
+
+<details><summary>click here</summary>
+<p>
 
 - You can look at the individual rules (code run for a specific file) in the snakemake file `/src/pipeline.smk`. You can also rerun a specific file without submitting it to the cluster. Using this approach will show you the command that's being run and the error message:
     ```
@@ -80,24 +91,23 @@ This is the lab's standard Ribo-Seq processing pipeline. It consists of a [docke
     Sys.glob('pipeline/collapse_reads/*/*.fastq.gz.collreadstats.txt')%>%setNames(.,basename(dirname(.)))%>%map(readLines)%>%map(head,4)%>%map(tail,2)%>%map(str_extract,'\\d+')%>%simplify2array%>%t%>%set_colnames(c('input','uniq'))%>%as.data.frame(stringsAsFactors=F)%>%rownames_to_column('sample')%>%mutate(unique = round(as.numeric(uniq)/as.numeric(input),3))
     ```
 
-### Running the pipeline
-- After the initial configuration and dry run use:
-    ```
-    bash ../src/snake_job.sh
-    ```
-
-    *Note: This command can be run interactively with screen for color-coded feedback or with qsub.*
+</p>
+</details>
+</br>
 
 ## Development
 
 >**What are Docker and Singularity?**  
-[Docker and Singularity](9) are both container management tools. A container is a layer you run programs with that allows you to virtualize everything below the operating system - i.e. you can run programs as if you have installed a totally different set of software. Docker needs root access for installation and usage which is a problem for server-sided use where permissions are often restricted. Singularity is able to use Docker containers but without root access.  
+[Docker and Singularity](https://sylabs.io/guides/2.6/user-guide/singularity_and_docker.html) are both container management tools. A container is a layer you run programs with that allows you to virtualize everything below the operating system - i.e. you can run programs as if you have installed a totally different set of software. Docker needs root access for installation and usage which is a problem for server-sided use where permissions are often restricted. Singularity is able to use Docker containers but without root access.  
 
 1. Build a container on a system where you have root access.
 2. Make this container available to the cluster (e.g. by uploading it to Docker hub). 
 3. Use singularity on the cluster to download and use this container, thus obviating the need to install software locally.  
 
-### Making changes to the container  
+### Making changes to the container
+
+<details><summary>click here</summary>
+<p>
 
 1. Install Docker
 2. Create or login to a profile on Docker hub.
@@ -128,19 +138,24 @@ This is the lab's standard Ribo-Seq processing pipeline. It consists of a [docke
         ```
         >*Note: The script passes the flags `—use-singularity  --singularity-args "-B /fast/AG_Ohler/:/fast/AG_Ohler/"` to snakemake so that each cluster node uses it.*
 
-### Tips for docker environments
+
+
+#### Tips for docker environments
 
 - It’s easy to unintentionally push the incorrect Docker environment as you build.  
 Make sure the commands are correct, especially the tag names. You can go on Docker hub and go to tags `>` latest, and see what commands were run to make the container. Click on each line to see the complete command.
 - Often, problems can occur when other entries in your `.bashrc` change your path.
 
+</p>
+</details>
+</br>
 
 ## Features
 TODO
 
 ## Configuration
 
-### `sample_config.tsv`
+### `sample_config.csv`
 
 |COLUMNS |Description|
 |:---:|:---:|
@@ -148,7 +163,7 @@ TODO
 |``file_id``| The file path|
 |``mate``|Identifier for paired end reads (1 or 2)|
 |``pair_id``|Groups paired end samples (the pair get the idential number)|
-|`libtype`|Tell salmon (and some other rules in the snakemake file) what kind of library it is, [see here](2). This will vary from library to library, but most frequently you'll have SF for Riboseq (single end forward strand) and SR or SF for the matching RNAseq.|
+|`libtype`|Tell salmon (and some other rules in the snakemake file) what kind of library it is, [see here](https://salmon.readthedocs.io/en/latest/library_type.html). This will vary from library to library, but most frequently you'll have SF for Riboseq (single end forward strand) and SR or SF for the matching RNAseq.|
 |`group`|Groups the biological replicates together.|
 |`isriboseq`|Should be either True or False when the sample is Riboseq or RNAseq, respectively.|  
 
@@ -171,7 +186,7 @@ https://docs.docker.com/get-started/overview/ 'What is Docker'
 https://sylabs.io/guides/2.6/user-guide/introduction.html 'Singularity intro'  
 https://sylabs.io/guides/2.6/user-guide/singularity_and_docker.html 'Singularity with Docker'
 
-[1]: https://sylabs.io/guides/3.0/user-guide/installation.html 'installation guide for singularity'  
+(1): https://sylabs.io/guides/3.0/user-guide/installation.html 'installation guide for singularity'  
 [2]: https://salmon.readthedocs.io/en/latest/library_type.html 'salmon libtype documentation'  
 [3]: https://github.com/ohlerlab/ORFquant.git 'ORFquant Git'  
 [4]: https://github.com/zslastman/Ribostan.git 'Ribostan Git'  
