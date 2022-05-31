@@ -4,47 +4,52 @@ This is the lab's standard Ribo-Seq processing pipeline. It consists of a [docke
 
 ## Installation
 
-1. **Install Singularity:**  
+### Prerequisites 
+- Singularity: [Link to guide.](https://sylabs.io/guides/3.0/user-guide/installationhtml)   
+*Note: If you have conda installed, it might interfer with Singularity.*
+    <details><summary>Click here for a fix</summary>
+    <p>
+    
+    Add this to the end of your path, e.g. `.bashrc` on linux  
 
-    [Link to guide.](https://sylabs.io/guides/3.0/user-guide/installation.html)   
-    *Note: If you have conda installed, it might interfer with Singularity.  
-    Add this to the end of your path, e.g. `.bashrc` on linux, to avoid this behavior:*
     ```
     export PATH=$PATH:/usr/bin
     export PATH=$PATH:/usr/sbin
     if [ $SINGULARITY_NAME ]; then
-        echo "in a singularity container, miniconda and guix entries are removed from path";
-        export PATH=$(echo $PATH | tr ':' '\n' | grep  -v '/guix' | grep -v '/miniconda' | tr '\n' ':' )
+        echo "in a singularity container, miniconda and guix entriesare    removed    from path";
+        export PATH=$(echo $PATH | tr ':' '\n' | grep  -v '/guix' | grep-v     '/  miniconda' | tr '\n' ':' )
         echo $PATH
     fi
     ```
+    </p>
+    </details>
+    </br>
 
-2. **Install our lab's RiboseQC, ORFquant, and Ribostan packages:**  
+- BiocManager (only for changing the Docker container, see [Development](/README.md##Development))  
+*Note: I you had to install BiocManager into your home directory, all packages to be installed by Docker also need to have lib='/home/usr/R/x86_64-pc-linux-gnu-library/VERSION' specified.* 
 
-    By default, the pipeline will look for a folder above the project folder called Applications, so create this folder (in e.g. `/fast/AG_Ohler/user/Applications`) and populate it like so:  
-    ```
-    mkdir Applications #create a folder in the current directory
-    git clone https://github.com/ohlerlab/RiboseQC.git Applications/RiboseQC
-    git clone https://github.com/ohlerlab/ORFquant.git Applications/ORFquant
-    git clone https://github.com/zslastman/Ribostan.git Applications/Ribostan
-    ```
+**1. Install this pipeline by git cloning**
 
-3. **Accessing the container for running locally:**  
-    ```
-    singularity run -B /fast/AG_Ohler/:/fast/AG_Ohler/ docker://dermotharnett/riboseq_pipeline
-    ```
-    *Note: the `-B` entry mounts file paths, so that Docker can see the folders.*   
+**2. Install our lab's RiboseQC, ORFquant, and Ribostan packages:**  
 
-    It will take a while to download all the necessary programs and libraries the first time.
+By default, the pipeline will look for a folder above the project folder (same directory as where the folder for the Ribo-Seq pipeline is) called Applications, so create this folder (in e.g. `/fast/AG_Ohler/userApplications`) and populate it like so:  
 
+```
+mkdir Applications #create a folder in the current directory
+git clone https://github.com/ohlerlab/RiboseQC.git Applications/RiboseQC
+git clone https://github.com/ohlerlab/ORFquant.git Applications/ORFquant
+git clone https://github.com/zslastman/Ribostan.git Applications/Ribostan
+```
+
+You should now have in your project folder `/userApplications` (example name) a folder `/RiboSeq` and a folder `/Applications` with the other packages in it.
 
 ## Usage
 
 ### Initial configuration
 
-1. Edit [sample_config.tsv](/README_new.md#sampleconfigtsv) in the folder `/src/` to point it to your fastq files (zipped or unzipped) with the appropriate parameters.
+1. Edit [sample_config.tsv](/README.md#sampleconfigtsv) in the folder `/RiboSeq/src/` to point it to your fastq files (zipped or unzipped) with the appropriate parameters.
 
-2. Edit [config.yaml.](/README_new.md#configyaml) This is where you put in for example, the path to annotation, genome sequence, etc.
+2. Edit [config.yaml.](/README.md#configyaml) This is where you put in for example, the path to annotation, genome sequence, etc.
 
 3. Dry run of the pipeline  
     Make and enter a pipeline directory: 
@@ -69,6 +74,16 @@ This is the lab's standard Ribo-Seq processing pipeline. It consists of a [docke
     ```
 
     *Note: This command can be run interactively with screen for color-coded feedback or with qsub.*
+
+- Accessing the container for running interactively: 
+     ```
+     singularity run -B /fast/AG_Ohler/:/fast/AG_Ohler/ docker://
+    dermotharnett/riboseq_pipeline
+     ```
+     *Note: the `-B` entry mounts file paths, so that Docker can see the 
+    folders.*   
+     It will take a while to download all the necessary programs and 
+    libraries the first time.
 
 ### Debugging
 
@@ -185,16 +200,6 @@ https://snakemake.readthedocs.io/en/stable/ 'Snakemake docs'
 https://docs.docker.com/get-started/overview/ 'What is Docker'  
 https://sylabs.io/guides/2.6/user-guide/introduction.html 'Singularity intro'  
 https://sylabs.io/guides/2.6/user-guide/singularity_and_docker.html 'Singularity with Docker'
-
-(1): https://sylabs.io/guides/3.0/user-guide/installation.html 'installation guide for singularity'  
-[2]: https://salmon.readthedocs.io/en/latest/library_type.html 'salmon libtype documentation'  
-[3]: https://github.com/ohlerlab/ORFquant.git 'ORFquant Git'  
-[4]: https://github.com/zslastman/Ribostan.git 'Ribostan Git'  
-[5]: https://github.com/ohlerlab/RiboseQC.git 'RiboseQC Git'  
-[6]: https://snakemake.readthedocs.io/en/stable/ 'Snakemake docs'  
-[7]: https://docs.docker.com/get-started/overview/ 'What is Docker'  
-[8]: https://sylabs.io/guides/2.6/user-guide/introduction.html 'Singularity intro'  
-[9]: https://sylabs.io/guides/2.6/user-guide/singularity_and_docker.html 'Singularity with Docker'
 
 ## Licensing
 TODO
