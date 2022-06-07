@@ -5,8 +5,9 @@ This is the lab's standard Ribo-Seq processing pipeline. It consists of a [docke
 ## Installation
 
 ### Prerequisites 
+- R
 - Singularity: [Link to guide.](https://sylabs.io/guides/3.0/user-guide/installationhtml)   
-*Note: If you have conda installed, it might interfer with Singularity.*
+*Note: If you already have conda installed, it might interfer with Singularity.*
     <details><summary>Click here for a fix</summary>
     <p>
     
@@ -25,14 +26,16 @@ This is the lab's standard Ribo-Seq processing pipeline. It consists of a [docke
     </details>
     </br>
 
-- BiocManager (only for changing the Docker container, see [Development](/README.md##Development))  
-*Note: I you had to install BiocManager into your home directory, all packages to be installed by Docker also need to have lib='/home/usr/R/x86_64-pc-linux-gnu-library/VERSION' specified.* 
 
 **1. Install this pipeline by git cloning**
+```
+cd /YourProjectFolder
+git clone https://github.com/ohlerlab/Riboseq_pipeline.git /RiboSeq
+```
 
 **2. Install our lab's RiboseQC, ORFquant, and Ribostan packages:**  
 
-By default, the pipeline will look for a folder above the project folder (same directory as where the folder for the Ribo-Seq pipeline is) called Applications, so create this folder (in e.g. `/fast/AG_Ohler/userApplications`) and populate it like so:  
+By default, the pipeline will look for a folder above the project folder called Applications. You can install these packages to somewhere else and specify the path in [config.yaml](/README.md#config.yaml). Populate it, like so:  
 
 ```
 mkdir Applications #create a folder in the current directory
@@ -41,15 +44,13 @@ git clone https://github.com/ohlerlab/ORFquant.git Applications/ORFquant
 git clone https://github.com/zslastman/Ribostan.git Applications/Ribostan
 ```
 
-You should now have in your project folder `/userApplications` (example name) a folder `/RiboSeq` and a folder `/Applications` with the other packages in it.
-
 ## Usage
 
 ### Initial configuration
 
-1. Edit [sample_config.tsv](/README.md#sampleconfigtsv) in the folder `/RiboSeq/src/` to point it to your fastq files (zipped or unzipped) with the appropriate parameters.
+1. Edit [sample_config.tsv](/README.md#sample_config.tsv) in the folder `/RiboSeq/src/` to point it to your fastq files (zipped or unzipped) with the appropriate parameters.
 
-2. Edit [config.yaml.](/README.md#configyaml) This is where you put in for example, the path to annotation, genome sequence, etc.
+2. Edit [config.yaml.](/README.md#config.yaml) This is where you put in for example, the path to annotation, genome sequence, etc.
 
 3. Dry run of the pipeline  
     Make and enter a pipeline directory: 
