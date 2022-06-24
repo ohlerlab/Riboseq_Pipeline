@@ -35,7 +35,7 @@ configfile: "../config/config.yaml"
 PROJECTFOLDER=config['PROJECTFOLDER']
 TMPDIR = Path('../tmp')
 
-seqfilesdf = pd.read_csv(config['sample_config'],dtype=str).set_index("sample_id", drop=False)
+seqfilesdf = pd.read_csv('../config/sample_config.csv'],dtype=str).set_index("sample_id", drop=False)
 #sampledf = pd.read_csv(config['sample_parameter']).set_index("sample_id", drop=False) old code from seperated config files, delete if script runs ok
 
 assert seqfilesdf.sample_id.is_unique
