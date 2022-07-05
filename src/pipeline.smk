@@ -32,13 +32,15 @@ shell.prefix("set -e pipefail;")
 
 configfile: "../config/config.yaml"
 
-PROJECTFOLDER=config['PROJECTFOLDER']
-TMPDIR = Path('../tmp')
+# PROJECTFOLDER=config['PROJECTFOLDER'] not used
+# TMPDIR = Path('../tmp') not used
 
-seqfilesdf = pd.read_csv('../config/sample_config.csv',dtype=str).set_index("sample_id", drop=False)
+seqfilesdf = pd.read_csv(config['sample_config'],dtype=str).set_index("sample_id", drop=False)
 #sampledf = pd.read_csv(config['sample_parameter']).set_index("sample_id", drop=False) old code from seperated config files, delete if script runs ok
 
-assert seqfilesdf.sample_id.is_unique
+
+###??? what is the use if this whole block till line 63?
+assert sampledf.sample_id.is_unique
 lacks_mate_info = (not 'mate' in seqfilesdf.columns) or (seqfilesdf.mate.isna().all())
 if lacks_mate_info: seqfilesdf['mate'] = '1'
 lacks_pair_id = (not 'pair_id' in seqfilesdf.columns) or (seqfilesdf.pair_id.isna().all())
@@ -49,8 +51,8 @@ lacks_file_id = not 'file_id' in seqfilesdf.columns or (seqfilesdf.file_id.isna(
 if lacks_file_id: seqfilesdf['file_id']=seqfilesdf.pair_id+'_R'+seqfilesdf.mate+'.fastq.gz'
 assert (~seqfilesdf.file_id.isna()).all()
 
-assert seqfilesdf.sample_id.is_unique
-assert isinstance(seqfilesdf.iloc[0,1],str), "file column should be a string in sample_config.csv"
+assert sampledf.sample_id.is_unique
+assert isinstance(seqfilesdf.iloc[0,1],str), "file column should be a string in read_files.csv"
 assert 'file_id' in seqfilesdf.columns
 assert not (pd.Series([Path(f).name for f in seqfilesdf.file_id]).duplicated().any()),"files need unique filenames"
 
@@ -76,6 +78,8 @@ for i in seqfilesdf.file: assert Path(i).stat().st_size > 100, "This file isn't 
 # seqfilesdf.insert(seqfilesdf.shape[1],'pair_id', pairids, False)
 #seqfilesdf.to_csv(config['sample_files'])
 
+
+###??? this line we can take out when we combine sample_files and sample_parameters
 #make sure our ids and files look ok
 assert set(seqfilesdf.sample_id) == set(seqfilesdf.sample_id), "Sample IDs need to be setequal in "+config['sample_files']+" and "+config['sample_parameter'] +": \n"+"seqfile ids " + seqfilesdf.sample_id[0:3] + "... \n" +"seqfile ids " + seqfilesdf.sample_id[0:3] + "... "
 
@@ -104,16 +108,14 @@ assert(Path(GTF_orig).exists()), GTF_orig + ", the GTF file, doesn't exist"
 REF = Path(Path(re.sub(string=REF_orig,pattern='.(b)?gz$',repl=r'')).name)
 GTF = Path(Path(re.sub(string=GTF_orig,pattern='.(b)?gz$',repl=r'')).name)
 
-RNAFASTA = GTF.with_suffix('.fa')
-CODINGFASTA=GTF.with_suffix('.coding.fa')
-PROTEINFASTA=GTF.with_suffix('.protein.fa')
-CDSFASTA=GTF.with_suffix('.cds.fa')
-BED=GTF.with_suffix('.bed')
-PCFASTA=config['PCFASTA']
-PCFASTA_tname = PCFASTA.replace('.fa','.shortheader.fa')
+# RNAFASTA = GTF.with_suffix('.fa') not used
+# CODINGFASTA=GTF.with_suffix('.coding.fa') not used
+# PROTEINFASTA=GTF.with_suffix('.protein.fa') not used
+# CDSFASTA=GTF.with_suffix('.cds.fa') not used
+# BED=GTF.with_suffix('.bed') not used
+# PCFASTA=config['PCFASTA'] not used
+PCFASTA_tname = config['PCFASTA'].replace('.fa','.shortheader.fa')
 
-#For now we'll just use star
-#ALIGNERS = ['hisat2','star']
 ALIGNERS = ['star']
 ALIGNER_TO_USE = 'star'
 
@@ -135,10 +137,6 @@ rule all:
     expand('riboseqc/data/{sample}/.done', sample=ribosamples),
     expand('salmon/data/{sample}/quant.sf',sample=rnasamples),
     expand('ribostan/{sample}/{sample}.ribostan.tsv', sample=ribosamples)
-
-MINREADLENGTH=config['MINREADLENGTH']
-MAXREADLENGTH=config['MAXREADLENGTH']
-QUALLIM=config['QUALLIM']
 
 
 ## copy_ref: create a plain text copy of the reference genome file in
@@ -221,6 +219,9 @@ rule link_in_files:
 ## quality scores lower than QUALLIM are trimmed off.
 
 ADAPTERSEQ=config['ADAPTERSEQ']
+MINREADLENGTH=config['MINREADLENGTH']
+MAXREADLENGTH=config['MAXREADLENGTH']
+QUALLIM=config['QUALLIM']
 
 rule cutadapt_reads:
   input: 'preprocessed_reads/{sample}/{fastq}'
@@ -259,9 +260,7 @@ rule collapse_reads:
     params: 
     shell: r"""
        set -evx
-
        mkdir -p collapse_reads/{wildcards.sample}/
-     
        zcat {input}  \
          | ../src/pipeline_scripts/collapse_reads.pl {wildcards.sample} \
          2> collapse_reads/{wildcards.sample}/{wildcards.fastq}.collreadstats.txt \
@@ -277,17 +276,15 @@ rule trim_reads:
     output: 'trim_reads/{sample}/{fastq}'
     params:
       outdir = lambda wc,output: Path(output[0]).parent
-    run:
-        sample = wildcards['sample']
-        shell(r"""
-          set -evx
-          OUTDIR=$(dirname {output})
-          mkdir -p  $OUTDIR
-          zcat {input} > {input}.nozip
-          ../src/pipeline_scripts/remove8N.pl {input}.nozip {output}
-          gzip -f {output}
-          mv {output}.gz {output}
-     """)
+    shell: r"""
+        set -evx
+        OUTDIR=$(dirname {output})
+        mkdir -p  $OUTDIR
+        zcat {input} > {input}.nozip
+        ../src/pipeline_scripts/remove8N.pl {input}.nozip {output}
+        gzip -f {output}
+        mv {output}.gz {output}
+     """
 
 
 ##########################################################
@@ -350,7 +347,7 @@ rule filter_tRNA_rRNA:
   # conda: '../envs/star'
   threads: 8
   params:
-    indexname = lambda wc,input: input[1].replace('.done',''),
+    # indexname = lambda wc,input: input[1].replace('.done',''), not used
     genomedir = lambda wc,input: input[1].replace('/tRNA_rRNA_index.done',''),
     outdir = lambda wc,output: os.path.dirname(output[0]),
     nozip = lambda wc,output: output[0].replace('.gz','')
@@ -419,12 +416,11 @@ def choose_processed_reads(wc,config=config):
 rule link_processed_reads:
   input: choose_processed_reads 
   output: 'processed_reads/{sample}/{fileid}'
-  run: 
-    shell(r"""
+  shell: r"""
         echo choose_processed_reads
         mkdir -p $(dirname {output} )
         for i in $(readlink -f {input} ); do  ln -rifs $i  {output} ; done
-    """)
+    """
     assert Path(output[0]).stat().st_size > 100
 
 
@@ -458,8 +454,7 @@ rule make_utrs:
   input: GTF=GTF_orig
   output: fputrs='fputrs.gtf',tputrs='tputrs.gtf'
   # script: 'make_utrfiles.R'
-  run:
-    shell(r"""
+  shell: r"""
       set -ex
       #with filtering output all sequences
       cat {input.GTF}  \
@@ -471,7 +466,7 @@ rule make_utrs:
       | awk -v OFS="\t"  '{{if($3=="three_prime_UTR"){{         ;print $0}}}}' \
       | sed -r  's/((transcript_id|gene_id|protein_id|ID=\w+|Parent)\W+\w+)\.[0-9]+/\1/g' \
       > {output.tputrs}
-      """) 
+      """
 
 
 ################################################################################
@@ -572,8 +567,6 @@ def get_file_string(wc,seqfilesdf=seqfilesdf):
  filestring = lfilestring+' '+rfilestring
  return(filestring)
 
-#changing from working with run/shell to only shell and putting everything in params. now have to
-
 rule star:
      input:
           lfastqs=get_sample_fastqs,
@@ -589,7 +582,7 @@ rule star:
         #filestring = lambda wc: get_file_string(wc,seqfilesdf),
         GEN_DIR=lambda wc,input: input.STARINDEX.replace('starindex.done',''),
         #only used for remap (now remap='')
-        markdup = lambda wc: '' if seqfilesdf.isriboseq[wc['sample']] else '-m',
+        # markdup = lambda wc: '' if seqfilesdf.isriboseq[wc['sample']] else '-m', not used?
         platform = 'NotSpecified',
         outputdir = lambda wc,output: os.path.dirname(output[0]),
         repdir = lambda wc,output: os.path.dirname(output[0]).replace('data','reports'),
@@ -597,7 +590,7 @@ rule star:
         halfthreads = lambda wc,threads: threads/2,
         sortmem = lambda wc,threads: str(int(5000/(threads/2)))+'M',
         #remap = '1' if seqfilesdf.isriboseq[wc['sample']] else ''
-        remap = '',
+        # remap = '',
         lfilestring = lambda wc,input: '<(zcat '+' '.join(input.lfastqs)+')',
         rfilestring = lambda wc,input: '<(zcat '+' '.join(input.rfastqs)+')' if input.rfastqs   else '' ,
      shell: r"""
@@ -1005,3 +998,6 @@ rule deseq_report:
   )
   '
   """
+
+
+  ### Make UMI and no UMI version
