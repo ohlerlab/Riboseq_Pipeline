@@ -26,64 +26,55 @@ shell.prefix("set -e pipefail;")
 
 
 ################################################################################
-########load and check  pipeline configuration
+########load and check pipeline configuration
 ################################################################################
- 
 
 configfile: "../config/config.yaml"
 
-PROJECTFOLDER=config['PROJECTFOLDER']
+PROJECTFOLDER = config['PROJECTFOLDER']
 TMPDIR = Path('../tmp')
 
-seqfilesdf = pd.read_csv('../config/sample_config.csv',dtype=str).set_index("sample_id", drop=False)
-#sampledf = pd.read_csv(config['sample_parameter']).set_index("sample_id", drop=False) old code from seperated config files, delete if script runs ok
+seqfilesdf = pd.read_csv('../config/sample_config.csv').set_index("sample_id", drop=False)
 
-assert seqfilesdf.sample_id.is_unique
-lacks_mate_info = (not 'mate' in seqfilesdf.columns) or (seqfilesdf.mate.isna().all())
-if lacks_mate_info: seqfilesdf['mate'] = '1'
-lacks_pair_id = (not 'pair_id' in seqfilesdf.columns) or (seqfilesdf.pair_id.isna().all())
-if lacks_pair_id:
+#check that all columns are present in sample_config.csv
+col_check = ['sample_id', 'file', 'mate', 'pair_id', 'libtype', 'group', 'isriboseq']
+for col in col_check: assert col in seqfilesdf.columns, "missing " + col + "column in smaple_config.csv"
+
+# check for duplicates in samples and files
+assert seqfilesdf['sample_id'].is_unique, "duplicate samples found"
+assert seqfilesdf['file'].is_unique, "duplicate filepaths found"
+for i in seqfilesdf.file: assert Path(i).stat().st_size > 100, "sample file " +i+  "too small (<100)"
+
+# check mate col for missing values and validity
+if seqfilesdf['mate'].isna().all(): seqfilesdf['mate'] = '1'
+else: seqfilesdf['mate'] = seqfilesdf['mate'].fillna('1')
+assert set(seqfilesdf.mate).issubset(set(['1','2'])), "mate can only be either 1 or 2"
+
+# check pair_id col for missing values and validity
+if seqfilesdf['pair_id'].isna().all():
     assert seqfilesdf['mate'].isin(['1']).all()
-    seqfilesdf['pair_id']=seqfilesdf['sample_id']
-lacks_file_id = not 'file_id' in seqfilesdf.columns or (seqfilesdf.file_id.isna().all())
-if lacks_file_id: seqfilesdf['file_id']=seqfilesdf.pair_id+'_R'+seqfilesdf.mate+'.fastq.gz'
-assert (~seqfilesdf.file_id.isna()).all()
+    seqfilesdf['pair_id'] = seqfilesdf['sample_id']
 
-assert seqfilesdf.sample_id.is_unique
-assert isinstance(seqfilesdf.iloc[0,1],str), "file column should be a string in sample_config.csv"
-assert 'file_id' in seqfilesdf.columns
-assert not (pd.Series([Path(f).name for f in seqfilesdf.file_id]).duplicated().any()),"files need unique filenames"
-
-seqfilesdf.mate = seqfilesdf.mate.fillna('1')
-assert set(seqfilesdf.mate).issubset(set(['1','2']))
-
-seqfilesdf.pair_id = seqfilesdf.pair_id.fillna(seqfilesdf.sample_id+'.fastq.gz')
-seqfilesdf.file_id = seqfilesdf.file_id.fillna(seqfilesdf.sample_id+'_'+seqfilesdf.mate+'.fastq.gz')
-
-assert seqfilesdf.file_id.is_unique,"pairid + mate combo must be unique"
+# check that pair_id + mate are a unique combination
+seqfilesdf['file_id'] = seqfilesdf['pair_id']+'_R' + seqfilesdf['mate'] + '.fastq.gz'
+seqfilesdf['file_id'] = seqfilesdf.file_id.fillna(seqfilesdf['sample_id'] + '_' + seqfilesdf['mate'] + '.fastq.gz')
+assert seqfilesdf.file_id.is_unique, "pair_id + mate matching must be unique"
 
 print('found '+str(len(seqfilesdf.sample_id))+' sample ids')
 print('for '+str(len(seqfilesdf))+' files')
 n_paired = str(sum(seqfilesdf.groupby('pair_id').size() > 1))
 print('of these, '+n_paired+' were paired')
 
-for i in seqfilesdf.file: assert Path(i).stat().st_size > 100, "This file isn't of size 100 or more " +i
-
-#For creating a pair ID column
-# pairids = [Path(f).name.replace('_R2_','_R1_').replace('.fastq.gz','') for f in seqfilesdf.file]
-# pairids = [re.sub('_[A-Za-z0-9]{8,20}$','',p) for p in pairids]
-# #insert tinot he read file
-# seqfilesdf.insert(seqfilesdf.shape[1],'pair_id', pairids, False)
-#seqfilesdf.to_csv(config['sample_files'])
-
-#make sure our ids and files look ok
-assert set(seqfilesdf.sample_id) == set(seqfilesdf.sample_id), "Sample IDs need to be setequal in "+config['sample_files']+" and "+config['sample_parameter'] +": \n"+"seqfile ids " + seqfilesdf.sample_id[0:3] + "... \n" +"seqfile ids " + seqfilesdf.sample_id[0:3] + "... "
-
 for sample in seqfilesdf.sample_id:
   for f in seqfilesdf.loc[[sample],'file']:
     fp = Path(f)
     assert fp.exists, f
     assert 'fastq.gz' in fp.name or 'fq.gz' in fp.name or 'fastq' in fp.name , f
+
+
+################################################################################
+######## set up input parameters
+################################################################################
 
 #define samples
 samples = list(seqfilesdf['sample_id'].unique())
