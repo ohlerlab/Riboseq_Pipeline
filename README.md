@@ -43,7 +43,9 @@ By default, the pipeline will look for a folder above /YourProjectFolder called 
 ```
 mkdir Applications #create a folder in the current directory
 git clone https://github.com/ohlerlab/RiboseQC.git Applications/RiboseQC
-git clone https://github.com/ohlerlab/ORFquant.git Applications/ORFquant
+#### git clone https://github.com/ohlerlab/ORFquant.git Applications/ORFquant
+#### for now please use lcalviell his repo as this is updated to the new genomicranges version
+git clone https://github.com/lcalviell/ORFquant.git Applications/ORFquant
 git clone https://github.com/zslastman/Ribostan.git Applications/Ribostan
 ```
 *Note: Git might have insufficient permisions to create a folder. If an error ending with 'Permission denied' occurs, create the sub-directories for the packages manually.*  
