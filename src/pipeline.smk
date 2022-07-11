@@ -3,7 +3,7 @@ import glob
 import pandas as pd
 from pathlib import Path
 from functools import partial
-from ipdb import set_trace
+# from ipdb import set_trace
 
 singularity: "docker://dermotharnett/riboseq_pipeline"
 
@@ -36,11 +36,13 @@ configfile: "../config/config.yaml"
 # TMPDIR = Path('../tmp') not used
 
 seqfilesdf = pd.read_csv(config['sample_config'],dtype=str).set_index("sample_id", drop=False)
+### Creates Boolean
+seqfilesdf.isriboseq=seqfilesdf.isriboseq.map({'True':True,'False':False})
 #sampledf = pd.read_csv(config['sample_parameter']).set_index("sample_id", drop=False) old code from seperated config files, delete if script runs ok
 
 
 ###??? what is the use if this whole block till line 63?
-assert sampledf.sample_id.is_unique
+assert seqfilesdf.sample_id.is_unique
 lacks_mate_info = (not 'mate' in seqfilesdf.columns) or (seqfilesdf.mate.isna().all())
 if lacks_mate_info: seqfilesdf['mate'] = '1'
 lacks_pair_id = (not 'pair_id' in seqfilesdf.columns) or (seqfilesdf.pair_id.isna().all())
@@ -51,7 +53,6 @@ lacks_file_id = not 'file_id' in seqfilesdf.columns or (seqfilesdf.file_id.isna(
 if lacks_file_id: seqfilesdf['file_id']=seqfilesdf.pair_id+'_R'+seqfilesdf.mate+'.fastq.gz'
 assert (~seqfilesdf.file_id.isna()).all()
 
-assert sampledf.sample_id.is_unique
 assert isinstance(seqfilesdf.iloc[0,1],str), "file column should be a string in read_files.csv"
 assert 'file_id' in seqfilesdf.columns
 assert not (pd.Series([Path(f).name for f in seqfilesdf.file_id]).duplicated().any()),"files need unique filenames"
@@ -226,7 +227,6 @@ QUALLIM=config['QUALLIM']
 rule cutadapt_reads:
   input: 'preprocessed_reads/{sample}/{fastq}'
   output: 'cutadapt_reads/{sample}/{fastq}'
-  #conda: '../envs/cutadapt'
   log: 'cutadapt_reads/{sample}/{fastq}.cutadaptstats.txt'
   shell: """    
        set -ex
@@ -344,7 +344,6 @@ rule make_trna_rrna_indices:
 rule filter_tRNA_rRNA: 
   input: 'trim_reads/{sample}/{fastq}','tRNA_rRNA_index/tRNA_rRNA_index.done'  
   output: 'filter_reads/{sample}/{fastq}'
-  # conda: '../envs/star'
   threads: 8
   params:
     # indexname = lambda wc,input: input[1].replace('.done',''), not used
@@ -416,13 +415,13 @@ def choose_processed_reads(wc,config=config):
 rule link_processed_reads:
   input: choose_processed_reads 
   output: 'processed_reads/{sample}/{fileid}'
-  shell: r"""
+  run: 
+    shell(r"""
         echo choose_processed_reads
         mkdir -p $(dirname {output} )
         for i in $(readlink -f {input} ); do  ln -rifs $i  {output} ; done
-    """
+    """)
     assert Path(output[0]).stat().st_size > 100
-
 
 ################################################################################
 ########Annotation
@@ -435,8 +434,6 @@ rule link_processed_reads:
 rule makeGTF:
   input: GTF=GTF_orig
   output: GTF
-  # conda: '../envs/gffread'
-  #conda: '~/miniconda3/envs/seq/bin/gffread'
   shell: r""" 
       # set -x
       #with filtering output all sequences
@@ -487,7 +484,6 @@ def get_sample_fastqs(wc,mate='1',folder='processed_reads',seqfilesdf=seqfilesdf
   isrna = isrna.all()
   folder =  config['FILT_RNA_FOLDER']if isrna else config['FILT_RIBO_FOLDER']
   matefiles = [folder+'/'+wc['sample']+'/'+f for f in filedf.file_id]
-  # import ipdb;ipdb.set_trace()
   return matefiles
 
 get_sample_fastqs2 = partial(get_sample_fastqs,mate='2')
@@ -510,7 +506,7 @@ rule fastqc:
 
 ## collect_fastqc: summarize FastQC results of all samples in a single
 ## tab-separated file.
-
+###??? why don't we do this anymore :(
 rule collect_fastqc:
      input:
           all_results = expand("fastqc/data/{sample}/.done", sample=samples)
@@ -539,7 +535,6 @@ rule star_index:
  input: REF=ancient(REF),GTF=ancient(GTF)
  output: touch('starindex/starindex.done')
  threads: 8
- # conda: "../envs/star"
  shell: r"""
    STAR \
      --runThreadN {threads} \
@@ -575,7 +570,6 @@ rule star:
      output:
           done = touch('star/data/{sample,[^/]+}/.done'),bam='star/data/{sample}/{sample}.bam',bai='star/data/{sample}/{sample}.bam.bai'
      threads: 8
-     # conda: "../envs/star"
      #please check params, there is a lot of stuff i did.
      params:
         sample= lambda wc: wc['sample'],
@@ -670,7 +664,6 @@ refflat = Path('qc') / Path(GTF).with_suffix('.refflat').name
 rule make_picard_files:
   input: GTF=GTF,bam=ALIGNER_TO_USE+'/data/'+samples[0]+'/'+samples[0]+'.bam'
   output: intervals=rrna_intervals,refflat=refflat
-  #conda: '../envs/picard'
   shell:r"""
         set -x 
           
@@ -702,7 +695,6 @@ rule qc:
           read_duplication= config['rnaseqpipescriptdir']+"read_duplication.sh",
      output:
           'qc/data/{sample}/read_alignment_report.tsv',done=touch('qc/data/{sample}/.done')
-     # conda: '../envs/picard'
      resources:
      params:
         singleendflag = lambda wc: ' -e ' if seqfilesdf.libtype.str.match('^[SU]')[wc.sample]  else '',
@@ -770,7 +762,7 @@ rule multiqc:
   #conda: '../envs/multiqc'
   params: 
     multiqcscript = config['multiqcscript'],
-    sample_reads_file=config['sample_files'],
+    sample_reads_file=seqfilesdf.file,
     reportsdirs= get_multiqc_dirs,
     sampnames = '--sample-names '+config.get('samplenamesfile') if config.get('samplenamesfile') else ''
   output:
@@ -829,8 +821,6 @@ rule run_ORFquant:
       mkdir -p {params.outputdir}
 
       R -e 'devtools::load_all("{RIBOSEQCPACKAGE}");devtools::load_all("{ORFquantPACKAGE}");run_ORFquant(for_ORFquant_file = {params.for_ORFquantfile},annotation_file = "{input.annofile}", n_cores = {threads},prefix="{params.outputdir}") '
-      
-      [ -f ORFquant/{sample}/final_ORFquant_results ] || exit
       """
 
 ##########################################################################
@@ -1001,3 +991,4 @@ rule deseq_report:
 
 
   ### Make UMI and no UMI version
+  ### 'Rsamtools','rtracklayer','GenomicAlignments','BSgenome','GenomicFiles','reshape2','DT','ggpubr','viridis','GenomicFeatures' for riboseqc
