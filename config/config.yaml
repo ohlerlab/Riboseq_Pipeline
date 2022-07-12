@@ -1,4 +1,4 @@
-PROJECTFOLDER: "/fast/AG_Ohler/dharnet/Riboseq_Pipeline/"
+PROJECTFOLDER: "/fast/AG_Ohler/Eelco/Ribofixtest/"
 REF_orig: "/fast/AG_Ohler/Riboseq_Pipeline_Data/ext_data/GRCm38.p5.genome.fa.gz"
 #annotation as gtf file - you can get these form the 
 GTF_orig: "/fast/AG_Ohler/Riboseq_Pipeline_Data/ext_data/gencode.vM12.annotation.gtf"
@@ -14,7 +14,7 @@ QUALLIM: 20
 #
 #sample_files: "../config/read_files.csv"
 #sample_parameter: "../config/sample_parameter.csv"
-sample_config: "..config/sample_config.csv"
+sample_config: "../config/sample_config.csv"
 #option to replace multiqc with ones own command (you can ignore unless you want to tweak the reports yourself)
 multiqcscript: 'multiqc'
 #this has some scripts for QC etc.
@@ -22,9 +22,9 @@ rnaseqpipescriptdir: '../src/pipeline_scripts/'
 #this is the adapter we want to trim off of our riboseq reads with cut adapt ()
 ADAPTERSEQ: "TGGAATTCTCGGGTGCCAAGG"
 #points towards installations of riboseqc and ORFquant
-RIBOSEQCPACKAGE: "../../Applications/RiboseQC/"
-ORFquantPACKAGE: "../../Applications/ORFquant/"
-RibostanPACKAGE: "../../Applications/Ribostan/"
+RIBOSEQCPACKAGE: "../Applications/RiboseQC/"
+ORFquantPACKAGE: "../Applications/ORFquant/"
+RibostanPACKAGE: "../Applications/Ribostan/"
 #this can be used to bypass some of the riboseq steps if necessary
 #leave as filter_reads for full pipeline, cutadapt reads if you have no UMIs.
 FILT_RIBO_FOLDER: "filter_reads"
