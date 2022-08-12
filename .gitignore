@@ -1,2 +1,8 @@
-src/run_deseq_old.R
-src/read_countdata_old.R
+data
+pipeline
+Applications
+ext_data
+plots
+tables
+.RData
+.Rhistory
