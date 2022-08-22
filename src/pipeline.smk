@@ -5,7 +5,8 @@ from pathlib import Path
 from functools import partial
 # from ipdb import set_trace
 
-singularity: "docker://dermotharnett/riboseq_pipeline"
+# singularity: "docker://dermotharnett/riboseq_pipeline"
+singularity: "docker://ggvillamil/riboseq_pipeline"
 
 #print('warning - sampling the first 100k reads');HEADIFTEST = '| head -n 400000'
 HEADIFTEST = ''
