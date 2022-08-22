@@ -5,12 +5,13 @@
 #$ -j yes #merge the stderr with the stdout
 #$ -o logs/ #stdout, job log
 #$ -m ea # send email beginning, end, and suspension
-#$ -M eelco.meerdink@mdc-berlin.de
+#$ -M gabriel.villamil@mdc-berlin.de
 #$ -N 'myjob'
 
 
 source ~/.bashrc
 mkdir -p sge_log
+conda activate snakemake
 snakemake -j 10 -k -p --restart-times 1 --max-jobs-per-second 5 -s Snakefile \
 	 --cluster-config ../config/config_pipeline.json  --rerun-incomplete \
 	 --use-singularity --singularity-args "-B /fast/AG_Ohler/:/fast/AG_Ohler"  \

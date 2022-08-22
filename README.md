@@ -29,13 +29,18 @@ This is the lab's standard Ribo-Seq processing pipeline. It consists of a [docke
 </details>
 </br>
 
+**1. Install Snakemake with Mamba
+```
+conda activate base
+mamba create -c conda-forge -c bioconda -n snakemake snakemake=6.2.1
+```
 
-**1. Install this pipeline by git cloning**
+**2. Install this pipeline by git cloning**
 ```
 git clone https://github.com/ohlerlab/Riboseq_Pipeline.git
 ```
 
-**2. Install our lab's RiboseQC, ORFquant, and Ribostan packages:**  
+**3. Install our lab's RiboseQC, ORFquant, and Ribostan packages:**  
 
 By default, the pipeline will look for a folder above /YourProjectFolder called Applications. You can install these packages to somewhere else and specify the path in [config.yaml](/README.md#config.yaml). Otherwise populate it, like so:  
 
