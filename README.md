@@ -9,12 +9,12 @@ This is the lab's standard Ribo-Seq processing pipeline. It consists of a [docke
 [Link to MDC HPC package installation.](https://guix.mdc-berlin.de/package/singularity)
 [Link to guide.](https://sylabs.io/guides/3.0/user-guide/installationhtml)   
 
-*Note: If you already have conda installed, it might interfer with Singularity.*  
+*Note: If you already have conda installed, it might interfere with Singularity.*  
 
 <details><summary>Click here for a fix</summary>
 <p>
     
-    Add this to the end of your path, e.g. `.bashrc` on linux  
+    Add this to the end of your `~/.bashrc` file
 
     ```
     export PATH=$PATH:/usr/bin
@@ -32,8 +32,7 @@ This is the lab's standard Ribo-Seq processing pipeline. It consists of a [docke
 
 **1. Install this pipeline by git cloning**
 ```
-cd /YourProjectFolder
-git clone https://github.com/ohlerlab/Riboseq_pipeline.git
+git clone https://github.com/ohlerlab/Riboseq_Pipeline.git
 ```
 
 **2. Install our lab's RiboseQC, ORFquant, and Ribostan packages:**  
@@ -41,12 +40,11 @@ git clone https://github.com/ohlerlab/Riboseq_pipeline.git
 By default, the pipeline will look for a folder above /YourProjectFolder called Applications. You can install these packages to somewhere else and specify the path in [config.yaml](/README.md#config.yaml). Otherwise populate it, like so:  
 
 ```
-mkdir Applications #create a folder in the current directory
-git clone https://github.com/ohlerlab/RiboseQC.git Applications/RiboseQC
-#### git clone https://github.com/ohlerlab/ORFquant.git Applications/ORFquant
-#### for now please use lcalviell his repo as this is updated to the new genomicranges version
-git clone https://github.com/lcalviell/ORFquant.git Applications/ORFquant
-git clone https://github.com/zslastman/Ribostan.git Applications/Ribostan
+mkdir Applications
+cd Applications
+git clone https://github.com/ohlerlab/RiboseQC.git
+git clone https://github.com/lcalviell/ORFquant.git
+git clone https://github.com/zslastman/Ribostan.git
 ```
 *Note: Git might have insufficient permisions to create a folder. If an error ending with 'Permission denied' occurs, create the sub-directories for the packages manually.*  
 
@@ -54,15 +52,15 @@ git clone https://github.com/zslastman/Ribostan.git Applications/Ribostan
 
 ### Initial configuration
 
-1. Edit [sample_config.tsv](/README.md#sample_config.tsv) in the folder `/RiboSeq/src/` to point it to your fastq files (zipped or unzipped) with the appropriate parameters.
+1. Edit [sample_config.csv](/README.md#sample_config.csv) in the folder `/Riboseq_Pipeline/config/` to point it to your fastq files (zipped or unzipped) with the appropriate parameters.
 
 2. Edit [config.yaml.](/README.md#config.yaml) This is where you put in for example, the path to annotation, genome sequence, etc.
 
-3. Dry run of the pipeline  
+3. Do a dry run of the pipeline  
     Make and enter a pipeline directory: 
     ```
-    cd /YourProjectFolder/Riboseq_pipeline
-    mkdir pipeline;cd pipeline
+    mkdir pipeline
+    cd pipeline
     ```
     Make a link to the snakefile:  
     -> calling this Snakefile doesn't work in a docker container
@@ -71,13 +69,13 @@ git clone https://github.com/zslastman/Ribostan.git Applications/Ribostan
     ```
     Access the container for running interactively: 
     ```
-    singularity run -B /fast/AG_Ohler/:/fast/AG_Ohler/ docker://
-    dermotharnett/riboseq_pipeline
+    singularity run -B /fast/AG_Ohler/:/fast/AG_Ohler/ docker://dermotharnett/riboseq_pipeline
     ```
     *Note: The `-B` entry mounts file paths, so that Docker can see the 
     folders.*   
     *Note: It will take a while to download all the necessary programs and 
-    libraries the first time.*  
+    libraries the first time.*
+    *Note: Some compute nodes on the Max Cluster do not have Singularity installed*
 
     Run the snakemake code without executing the rules:
     ```
@@ -90,7 +88,7 @@ git clone https://github.com/zslastman/Ribostan.git Applications/Ribostan
 - After the initial configuration and dry run use:
 -> this doesn't work without the dependencies
     ```
-    bash ../src/snake_job.sh
+    bash ../config/snake_job.sh
     ```
 
     *Note: This command can be run interactively with screen for color-coded feedback (qrsh) or with qsub.*
@@ -112,7 +110,7 @@ git clone https://github.com/zslastman/Ribostan.git Applications/Ribostan
     grep Summary -A7 pipeline/cutadapt_reads/*/*fastq.gz.cutadaptstats.txt
     ```
 
-- Command to see how many reads were lost to *collaps_reads*:
+- Command to see how many reads were lost to *collapse_reads*:
     ```
     Sys.glob('pipeline/collapse_reads/*/*.fastq.gz.collreadstats.txt')%>%setNames(.,basename(dirname(.)))%>%map(readLines)%>%map(head,4)%>%map(tail,2)%>%map(str_extract,'\\d+')%>%simplify2array%>%t%>%set_colnames(c('input','uniq'))%>%as.data.frame(stringsAsFactors=F)%>%rownames_to_column('sample')%>%mutate(unique = round(as.numeric(uniq)/as.numeric(input),3))
     ```
@@ -146,7 +144,7 @@ git clone https://github.com/zslastman/Ribostan.git Applications/Ribostan
     ```
 5. Build the container with: 
     ```
-    docker build -t YOUR_DOCKERHUB_NAME/riboseq_pipeline
+    docker build -t YOUR_DOCKERHUB_NAME/riboseq_pipeline .
     ```
 6. Push it to Docker hub with: 
     ```
@@ -177,7 +175,7 @@ Make sure the commands are correct, especially the tag names. You can go on Dock
 </br>
 
 ## Features
-TODO
+- Runs on Singularity
 
 ## Configuration
 
@@ -199,7 +197,9 @@ TODO add some options for tuning the pipeline like
 - `FILT_RNA_FOLDER`
 
 ## Contributing
-TODO
+Current development and maintenance: @ggvillamil, @Emeerdink
+Original pipeline and development: @zslastman
+Streamlining and documentation: @rnschmdlr
 
 ## Links
 https://guix.mdc-berlin.de/package/singularity 'link to MDC HPC package installation'
