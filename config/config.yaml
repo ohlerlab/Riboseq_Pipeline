@@ -1,4 +1,4 @@
-PROJECTFOLDER: "/fast/AG_Ohler/Eelco/Ribofixtest/"
+PROJECTFOLDER: "/fast/AG_Ohler/gabriel/Riboseq_Pipeline/"
 REF_orig: "/fast/AG_Ohler/Riboseq_Pipeline_Data/ext_data/GRCm38.p5.genome.fa.gz"
 #annotation as gtf file - you can get these form the 
 GTF_orig: "/fast/AG_Ohler/Riboseq_Pipeline_Data/ext_data/gencode.vM12.annotation.gtf"
@@ -21,10 +21,6 @@ multiqcscript: 'multiqc'
 rnaseqpipescriptdir: '../src/pipeline_scripts/'
 #this is the adapter we want to trim off of our riboseq reads with cut adapt ()
 ADAPTERSEQ: "TGGAATTCTCGGGTGCCAAGG"
-#points towards installations of riboseqc and ORFquant
-RIBOSEQCPACKAGE: "../Applications/RiboseQC/"
-ORFquantPACKAGE: "../Applications/ORFquant/"
-RibostanPACKAGE: "../Applications/Ribostan/"
 #this can be used to bypass some of the riboseq steps if necessary
 #leave as filter_reads for full pipeline, cutadapt reads if you have no UMIs.
 FILT_RIBO_FOLDER: "filter_reads"
