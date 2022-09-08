@@ -762,7 +762,6 @@ rule multiqc:
       {params.multiqcscript} {params.reportsdirs} -fo $(dirname {output[0]}) {params.sampnames}
       """
 
-RIBOSEQCPACKAGE = config['RIBOSEQCPACKAGE']
 rule make_riboseqc_anno:
   input : 
     GTF,
@@ -775,7 +774,7 @@ rule make_riboseqc_anno:
     set -x
     awk -vOFS="\t" '{{print $1,0,$2}}' {REF}.fai | bedtools intersect -b - -a {GTF} > {params.gtfmatchchrs} 
     mkdir -p $(dirname {output[0]})
-    R -e 'devtools::load_all("{RIBOSEQCPACKAGE}");args(prepare_annotation_files) ;prepare_annotation_files(annotation_directory=".",gtf_file="{params.gtfmatchchrs}",annotation_name="{params.annobase}",forge_BS=FALSE, genome_seq=FaFile("{REF}"))'
+    R -e 'library(RiboseQC);args(prepare_annotation_files) ;prepare_annotation_files(annotation_directory=".",gtf_file="{params.gtfmatchchrs}",annotation_name="{params.annobase}",forge_BS=FALSE, genome_seq=FaFile("{REF}"))'
  """
 
 rule run_riboseqc:
@@ -790,11 +789,9 @@ rule run_riboseqc:
          set -x
          mkdir -p {params.outname}
          mkdir -p riboseqc/reports/{wildcards.sample}
-         R -e 'devtools::load_all("{RIBOSEQCPACKAGE}");RiboseQC::RiboseQC_analysis("{params.annofile}", bam="{input.bam}",rescue_all_rls=TRUE,dest_names="{params.outname}", genome_seq = "{REF}", report_file="{params.report_file}")'
+         R -e 'library(RiboseQC);RiboseQC::RiboseQC_analysis("{params.annofile}", bam="{input.bam}",rescue_all_rls=TRUE,dest_names="{params.outname}", genome_seq = "{REF}", report_file="{params.report_file}")'
      """
 
-#####Added pulling ORFquant from the config
-ORFquantPACKAGE = config['ORFquantPACKAGE']
 rule run_ORFquant:
   input : 'riboseqc/data/{sample}/.done',annofile=GTF.with_suffix('.matchchrs.gtf_Rannot')
   output: touch('ORFquant/{sample}/.done')
@@ -807,7 +804,7 @@ rule run_ORFquant:
     set -ex
       mkdir -p {params.outputdir}
 
-      R -e 'devtools::load_all("{RIBOSEQCPACKAGE}");devtools::load_all("{ORFquantPACKAGE}");run_ORFquant(for_ORFquant_file = {params.for_ORFquantfile},annotation_file = "{input.annofile}", n_cores = {threads},prefix="{params.outputdir}") '
+      R -e 'library(RiboseQC);library(ORFquant);run_ORFquant(for_ORFquant_file = {params.for_ORFquantfile},annotation_file = "{input.annofile}", n_cores = {threads},prefix="{params.outputdir}") '
       """
 
 ##########################################################################
@@ -819,7 +816,7 @@ rule make_orf_fasta:
   output: fasta=ORFEXT_FASTA
   shell:r"""set -ex
   mkdir -p $(dirname {output.fasta})
-  R -e 'devtools::load_all("{RIBOSTANPACKAGE}");make_ext_fasta(gtf="{input.gtf}",fa="{input.fasta}",out="{output.fasta}")'
+  R -e 'library(Ribostan);make_ext_fasta(gtf="{input.gtf}",fa="{input.fasta}",out="{output.fasta}")'
   """
 
 rule star_transcript_index:
@@ -912,9 +909,6 @@ rule salmon:
       --validateMappings
 """
 
-
-RIBOSTANPACKAGE = config['RibostanPACKAGE']
-
 rule ribostan:
   input:
     ribobam = 'star/ORFext/data/{sample}/{sample}.bam',
@@ -924,7 +918,7 @@ rule ribostan:
   output: efile = 'ribostan/{sample}/{sample}.ribostan.tsv'
   shell: r"""
     mkdir -p $( dirname {output.efile} ) 
-    R -e 'devtools::load_all("{RIBOSTANPACKAGE}");get_exprfile("{input.ribobam}", "{input.ribofasta}", "{output.efile}")'
+    R -e 'library(Ribostan);get_exprfile("{input.ribobam}", "{input.ribofasta}", "{output.efile}")'
   """
 
 
