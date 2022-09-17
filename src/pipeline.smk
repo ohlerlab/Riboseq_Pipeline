@@ -917,7 +917,7 @@ rule ribostan:
   # conda: '../envs/ribostan'
   output: efile = 'ribostan/{sample}/{sample}.ribostan.tsv'
   shell: r"""
-    mkdir -p $( dirname {output.efile} ) 
+    mkdir -p $( dirname {output.efile} ) && \
     R -e 'library(Ribostan);get_exprfile("{input.ribobam}", "{input.ribofasta}", "{output.efile}")'
   """
 
