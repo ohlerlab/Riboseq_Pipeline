@@ -1,19 +1,19 @@
 # Ribo-Seq Pipeline
 
 This is the lab's standard Ribo-Seq processing pipeline. It consists of a [docker](https://docs.docker.com/get-started/overview/)ised [Snakemake](https://snakemake.readthedocs.io/en/stable/) workflow that ties together R scripts, as well as [RiboseQC](https://github.com/ohlerlab/RiboseQC.git), [ORFquant](https://github.com/ohlerlab/ORFquant.git), and [Ribostan](https://github.com/zslastman/Ribostan.git) and can be run in [Singularity](https://sylabs.io/guides/2.6/user-guide/introduction.html).  
-  
+
+&nbsp;
 ## Installation
 
 ### Prerequisites 
-- Singularity (should be pre-installed on the cluster): 
-[Link to MDC HPC package installation.](https://guix.mdc-berlin.de/package/singularity)
-[Link to guide.](https://sylabs.io/guides/3.0/user-guide/installationhtml)   
+Singularity (should be pre-installed on the cluster):  
+- [Link to MDC HPC package installation](https://guix.mdc-berlin.de/package/singularity)  
+- [Link to guide](https://sylabs.io/guides/3.0/user-guide/installationhtml)  
 
 *Note: If you already have conda installed, it might interfere with Singularity.*  
 
 <details><summary>Click here for a fix</summary>
 <p>
-    
     Add this to the end of your `~/.bashrc` file
 
     ```
@@ -39,7 +39,7 @@ mamba create -c conda-forge -c bioconda -n snakemake snakemake=6.2.1
 ```
 git clone https://github.com/ohlerlab/Riboseq_Pipeline.git
 ```
-  
+&nbsp;
 ## Usage
 
 ### Initial configuration
@@ -64,6 +64,7 @@ git clone https://github.com/ohlerlab/Riboseq_Pipeline.git
     ```  
     Check whether your output files (sampledf or seqfilesdf) look right.  
     A common reason for errors are misspecified paths or misplaced symbols like **'. ,'**.   
+&nbsp;
 
 ### Running the pipeline
 - After the initial configuration and dry run use:
@@ -81,7 +82,8 @@ git clone https://github.com/ohlerlab/Riboseq_Pipeline.git
     *Note: It will take a while to download all the necessary programs and 
     libraries the first time.*
     *Note: Some compute nodes on the Max Cluster do not have Singularity installed*
-  
+&nbsp;
+
 ### Debugging
 
 <details><summary>click here</summary>
@@ -106,7 +108,8 @@ git clone https://github.com/ohlerlab/Riboseq_Pipeline.git
 </p>
 </details>
 </br>
-  
+&nbsp;
+
 ## Development
 
 >**What are Docker and Singularity?**  
@@ -115,6 +118,7 @@ git clone https://github.com/ohlerlab/Riboseq_Pipeline.git
 1. Build a container on a system where you have root access.
 2. Make this container available to the cluster (e.g. by uploading it to Docker hub). 
 3. Use singularity on the cluster to download and use this container, thus obviating the need to install software locally.  
+&nbsp;
 
 ### Making changes to the container
 
@@ -149,8 +153,7 @@ git clone https://github.com/ohlerlab/Riboseq_Pipeline.git
         bash ../src/snake_job.sh
         ```
         >*Note: The script passes the flags `—use-singularity  --singularity-args "-B /fast/AG_Ohler/:/fast/AG_Ohler/"` to snakemake so that each cluster node uses it.*
-
-
+&nbsp;
 
 #### Tips for docker environments
 
@@ -161,10 +164,12 @@ Make sure the commands are correct, especially the tag names. You can go on Dock
 </p>
 </details>
 </br>
-  
+&nbsp;
+
 ## Features
 - Runs on Singularity
-  
+&nbsp;
+
 ## Configuration
 
 ### `sample_config.csv`
@@ -183,11 +188,13 @@ Make sure the commands are correct, especially the tag names. You can go on Dock
 TODO add some options for tuning the pipeline like  
 - `FILT_RIBO_FOLDER`  
 - `FILT_RNA_FOLDER`
-  
+&nbsp;
+
 ## Contributing
 Original pipeline and development: @zslastman  
 Current development and maintenance: @ggvillamil, @Emeerdink  
 Streamlining and documentation: @rnschmdlr
+&nbsp;
 
 ## Links
 https://guix.mdc-berlin.de/package/singularity 'link to MDC HPC package installation'
@@ -200,6 +207,7 @@ https://snakemake.readthedocs.io/en/stable/ 'Snakemake docs'
 https://docs.docker.com/get-started/overview/ 'What is Docker'  
 https://sylabs.io/guides/2.6/user-guide/introduction.html 'Singularity intro'  
 https://sylabs.io/guides/2.6/user-guide/singularity_and_docker.html 'Singularity with Docker'
-  
+&nbsp;
+
 ## Licensing
 TODO
