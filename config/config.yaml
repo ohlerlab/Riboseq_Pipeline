@@ -1,9 +1,9 @@
 PROJECTFOLDER: "/fast/AG_Ohler/gabriel/Riboseq_Pipeline/"
-REF_orig: "/fast/AG_Ohler/Riboseq_Pipeline_Data/ext_data/GRCm38.p5.genome.fa.gz"
+REF_orig: "../ext_data/GRCm38.p5.genome.fa.gz"
 #annotation as gtf file - you can get these form the 
-GTF_orig: "/fast/AG_Ohler/Riboseq_Pipeline_Data/ext_data/gencode.vM12.annotation.gtf"
+GTF_orig: "../ext_data/gencode.vM12.annotation.gtf"
 #
-PCFASTA: "/fast/AG_Ohler/Riboseq_Pipeline_Data/ext_data/gencode.vM12.pc_transcripts.fa"
+PCFASTA: "../ext_data/gencode.vM12.pc_transcripts.fa"
 #a file of contaminants (tRNA, rRNA etc for your organism)
 Contam: "../ext_data/contaminants.fa"
 #read lengths for cut adapt to filter out - note that we'll do further filtering later in riboseqc etc

@@ -81,7 +81,7 @@ git clone https://github.com/ohlerlab/Riboseq_Pipeline.git
     folders.*   
     *Note: It will take a while to download all the necessary programs and 
     libraries the first time.*
-    *Note: Some compute nodes on the Max Cluster do not have Singularity installed*
+    *Note: Some compute nodes on the Max Cluster do not have Singularity installed*  
 &nbsp;
 
 ### Debugging
@@ -167,7 +167,7 @@ Make sure the commands are correct, especially the tag names. You can go on Dock
 &nbsp;
 
 ## Features
-- Runs on Singularity
+- Runs on Singularity  
 &nbsp;
 
 ## Configuration
@@ -187,13 +187,13 @@ Make sure the commands are correct, especially the tag names. You can go on Dock
 ### `config.yaml`
 TODO add some options for tuning the pipeline like  
 - `FILT_RIBO_FOLDER`  
-- `FILT_RNA_FOLDER`
+- `FILT_RNA_FOLDER`  
 &nbsp;
 
 ## Contributing
 Original pipeline and development: @zslastman  
 Current development and maintenance: @ggvillamil, @Emeerdink  
-Streamlining and documentation: @rnschmdlr
+Streamlining and documentation: @rnschmdlr  
 &nbsp;
 
 ## Links
@@ -206,7 +206,7 @@ https://github.com/ohlerlab/RiboseQC.git 'RiboseQC Git'
 https://snakemake.readthedocs.io/en/stable/ 'Snakemake docs'  
 https://docs.docker.com/get-started/overview/ 'What is Docker'  
 https://sylabs.io/guides/2.6/user-guide/introduction.html 'Singularity intro'  
-https://sylabs.io/guides/2.6/user-guide/singularity_and_docker.html 'Singularity with Docker'
+https://sylabs.io/guides/2.6/user-guide/singularity_and_docker.html 'Singularity with Docker'  
 &nbsp;
 
 ## Licensing
