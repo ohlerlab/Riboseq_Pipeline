@@ -29,7 +29,7 @@ This is the lab's standard Ribo-Seq processing pipeline. It consists of a [docke
 </details>
 </br>
 
-**1. Install Snakemake with Mamba
+**1. Install Snakemake with Mamba**
 ```
 conda activate base
 mamba create -c conda-forge -c bioconda -n snakemake snakemake=6.2.1
@@ -38,18 +38,6 @@ mamba create -c conda-forge -c bioconda -n snakemake snakemake=6.2.1
 **2. Install this pipeline by git cloning**
 ```
 git clone https://github.com/ohlerlab/Riboseq_Pipeline.git
-```
-
-**3. Install our lab's RiboseQC, ORFquant, and Ribostan packages:**  
-
-By default, the pipeline will look for a folder above /YourProjectFolder called Applications. You can install these packages to somewhere else and specify the path in [config.yaml](/README.md#config.yaml). Otherwise populate it, like so:  
-
-```
-mkdir Applications
-cd Applications
-git clone https://github.com/ohlerlab/RiboseQC.git
-git clone https://github.com/lcalviell/ORFquant.git
-git clone https://github.com/zslastman/Ribostan.git
 ```
 *Note: Git might have insufficient permisions to create a folder. If an error ending with 'Permission denied' occurs, create the sub-directories for the packages manually.*  
 
@@ -61,28 +49,17 @@ git clone https://github.com/zslastman/Ribostan.git
 
 2. Edit [config.yaml.](/README.md#config.yaml) This is where you put in for example, the path to annotation, genome sequence, etc.
 
-3. Do a dry run of the pipeline  
-    Make and enter a pipeline directory: 
+3. Make the *pipeline* directory which serves as the working directory for Snakemake:
     ```
     mkdir pipeline
+    ```
+    *Note: Snakemake will create output directories and put output files here as rules are executed.*
+    Make a link to the snakefile:
+    ```
     cd pipeline
-    ```
-    Make a link to the snakefile:  
-    -> calling this Snakefile doesn't work in a docker container
-    ```
     ln -s ../src/pipeline.smk Snakefile
     ```
-    Access the container for running interactively: 
-    ```
-    singularity run -B /fast/AG_Ohler/:/fast/AG_Ohler/ docker://dermotharnett/riboseq_pipeline
-    ```
-    *Note: The `-B` entry mounts file paths, so that Docker can see the 
-    folders.*   
-    *Note: It will take a while to download all the necessary programs and 
-    libraries the first time.*
-    *Note: Some compute nodes on the Max Cluster do not have Singularity installed*
-
-    Run the snakemake code without executing the rules:
+4. Do a dry run, i.e. run the snakemake code without executing the rules:
     ```
     snakemake -n
     ```  
@@ -91,13 +68,20 @@ git clone https://github.com/zslastman/Ribostan.git
 
 ### Running the pipeline
 - After the initial configuration and dry run use:
--> this doesn't work without the dependencies
     ```
     bash ../config/snake_job.sh
     ```
-
     *Note: This command can be run interactively with screen for color-coded feedback (qrsh) or with qsub.*
 
+- Alternatively, access the container for running interactively: 
+    ```
+    singularity run -B /fast/AG_Ohler/:/fast/AG_Ohler/ docker://dermotharnett/riboseq_pipeline
+    ```
+    *Note: The `-B` entry mounts file paths, so that Docker can see the 
+    folders.*   
+    *Note: It will take a while to download all the necessary programs and 
+    libraries the first time.*
+    *Note: Some compute nodes on the Max Cluster do not have Singularity installed*
 
 ### Debugging
 
