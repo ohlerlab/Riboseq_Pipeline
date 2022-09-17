@@ -1,7 +1,7 @@
 # Ribo-Seq Pipeline
 
-This is the lab's standard Ribo-Seq processing pipeline. It consists of a [docker](https://docs.docker.com/get-started/overview/)ised [snakemake](https://snakemake.readthedocs.io/en/stable/) workflow that ties together R scripts, as well as [ORFquant](https://github.com/ohlerlab/ORFquant.git), [Ribostan](https://github.com/zslastman/Ribostan.git) and [RiboseQC](https://github.com/ohlerlab/RiboseQC.git) and can be run in [Singularity](https://sylabs.io/guides/2.6/user-guide/introduction.html).  
-
+This is the lab's standard Ribo-Seq processing pipeline. It consists of a [docker](https://docs.docker.com/get-started/overview/)ised [Snakemake](https://snakemake.readthedocs.io/en/stable/) workflow that ties together R scripts, as well as [RiboseQC](https://github.com/ohlerlab/RiboseQC.git), [ORFquant](https://github.com/ohlerlab/ORFquant.git), and [Ribostan](https://github.com/zslastman/Ribostan.git) and can be run in [Singularity](https://sylabs.io/guides/2.6/user-guide/introduction.html).  
+  
 ## Installation
 
 ### Prerequisites 
@@ -39,8 +39,7 @@ mamba create -c conda-forge -c bioconda -n snakemake snakemake=6.2.1
 ```
 git clone https://github.com/ohlerlab/Riboseq_Pipeline.git
 ```
-*Note: Git might have insufficient permisions to create a folder. If an error ending with 'Permission denied' occurs, create the sub-directories for the packages manually.*  
-
+  
 ## Usage
 
 ### Initial configuration
@@ -53,13 +52,13 @@ git clone https://github.com/ohlerlab/Riboseq_Pipeline.git
     ```
     mkdir pipeline
     ```
-    *Note: Snakemake will create output directories and put output files here as rules are executed.*
+    *Note: Snakemake will create output directories and put output files here as rules are executed.*  
     Make a link to the snakefile:
     ```
     cd pipeline
     ln -s ../src/pipeline.smk Snakefile
     ```
-4. Do a dry run, i.e. run the snakemake code without executing the rules:
+4. Do a dry run, i.e. run the Snakemake code without executing the rules:
     ```
     snakemake -n
     ```  
@@ -82,7 +81,7 @@ git clone https://github.com/ohlerlab/Riboseq_Pipeline.git
     *Note: It will take a while to download all the necessary programs and 
     libraries the first time.*
     *Note: Some compute nodes on the Max Cluster do not have Singularity installed*
-
+  
 ### Debugging
 
 <details><summary>click here</summary>
@@ -107,7 +106,7 @@ git clone https://github.com/ohlerlab/Riboseq_Pipeline.git
 </p>
 </details>
 </br>
-
+  
 ## Development
 
 >**What are Docker and Singularity?**  
@@ -162,10 +161,10 @@ Make sure the commands are correct, especially the tag names. You can go on Dock
 </p>
 </details>
 </br>
-
+  
 ## Features
 - Runs on Singularity
-
+  
 ## Configuration
 
 ### `sample_config.csv`
@@ -184,10 +183,10 @@ Make sure the commands are correct, especially the tag names. You can go on Dock
 TODO add some options for tuning the pipeline like  
 - `FILT_RIBO_FOLDER`  
 - `FILT_RNA_FOLDER`
-
+  
 ## Contributing
-Current development and maintenance: @ggvillamil, @Emeerdink
-Original pipeline and development: @zslastman
+Original pipeline and development: @zslastman  
+Current development and maintenance: @ggvillamil, @Emeerdink  
 Streamlining and documentation: @rnschmdlr
 
 ## Links
@@ -201,6 +200,6 @@ https://snakemake.readthedocs.io/en/stable/ 'Snakemake docs'
 https://docs.docker.com/get-started/overview/ 'What is Docker'  
 https://sylabs.io/guides/2.6/user-guide/introduction.html 'Singularity intro'  
 https://sylabs.io/guides/2.6/user-guide/singularity_and_docker.html 'Singularity with Docker'
-
+  
 ## Licensing
 TODO
